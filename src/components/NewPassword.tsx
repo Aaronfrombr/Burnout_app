@@ -1,7 +1,8 @@
 import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
-import styles from "../styles/Register.module.css";
-import { Eye, EyeOff, User, Mail, Lock, CheckCircle, AlertCircle, X } from "lucide-react";
+import { useRouter } from "next/router";
+import styles from "../styles/NewPass.module.css";
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, X } from "lucide-react";
 
 type ModalType = "success" | "error" | null;
 
@@ -12,25 +13,6 @@ interface ModalProps {
 }
 
 const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
-  useEffect(() => {
-    // Impede rolagem do corpo quando o modal está aberto
-    document.body.style.overflow = "hidden";
-    
-    // Listener para tecla ESC fechar o modal
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-    
-    window.addEventListener("keydown", handleEsc);
-    
-    return () => {
-      document.body.style.overflow = "auto";
-      window.removeEventListener("keydown", handleEsc);
-    };
-  }, [onClose]);
-  
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div 
@@ -48,45 +30,78 @@ const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
           )}
         </div>
         <h3 className={styles.modalTitle}>
-          {type === "success" ? "Sucesso!" : "Erro!"}
+          {type === "success" ? "Senha atualizada!" : "Erro!"}
         </h3>
         <p className={styles.modalMessage}>{message}</p>
         <button 
           className={styles.modalButton}
           onClick={onClose}
         >
-          {type === "success" ? "Continuar" : "Tentar novamente"}
+          {type === "success" ? "Ir para login" : "Tentar novamente"}
         </button>
       </div>
     </div>
   );
 };
 
-export default function Register() {
+export default function ResetPassword() {
+  const router = useRouter();
+  const { token } = router.query;
+  
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
     password: "",
     confirmPassword: "",
-    acceptTerms: false
   });
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
   
   // Estados para o modal
   const [modalType, setModalType] = useState<ModalType>(null);
   const [modalMessage, setModalMessage] = useState("");
   
+  // Verificar token ao carregar
+  useEffect(() => {
+    if (token) {
+      // Aqui você verificaria a validade do token com seu backend
+      // Simulação
+      const validateToken = async () => {
+        try {
+          console.log("Validando token:", token);
+          // Simular chamada de API
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          // Para fins de demonstração, considere o token válido se tiver mais de 10 caracteres
+          if (typeof token === 'string' && token.length > 10) {
+            setIsTokenValid(true);
+          } else {
+            setIsTokenValid(false);
+            setErrors({
+              token: "Link de redefinição inválido ou expirado. Solicite um novo link."
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao validar token:", error);
+          setIsTokenValid(false);
+          setErrors({
+            token: "Não foi possível validar seu link de redefinição. Tente novamente mais tarde."
+          });
+        }
+      };
+      
+      validateToken();
+    }
+  }, [token]);
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    const newValue = type === "checkbox" ? checked : value;
+    const { name, value } = e.target;
     
     setFormData(prev => ({
       ...prev,
-      [name]: newValue
+      [name]: value
     }));
     
     // Limpa o erro do campo quando o usuário começa a digitar
@@ -102,28 +117,14 @@ export default function Register() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     
-    if (!formData.name.trim()) {
-      newErrors.name = "Nome é obrigatório";
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = "Email é obrigatório";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Email inválido";
-    }
-    
     if (!formData.password) {
-      newErrors.password = "Senha é obrigatória";
+      newErrors.password = "Nova senha é obrigatória";
     } else if (formData.password.length < 6) {
       newErrors.password = "A senha deve ter pelo menos 6 caracteres";
     }
     
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "As senhas não coincidem";
-    }
-    
-    if (!formData.acceptTerms) {
-      newErrors.acceptTerms = "Você deve aceitar os termos de uso";
     }
     
     setErrors(newErrors);
@@ -137,32 +138,25 @@ export default function Register() {
       setIsSubmitting(true);
       
       try {
-        console.log("Dados do formulário:", formData);
+        console.log("Dados do formulário:", { ...formData, token });
         // Simulação de envio para o backend
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Simulando uma resposta bem-sucedida (aqui seria a integração com o backend)
-        if (Math.random() > 0.3) { // 70% de chance de sucesso para simulação
-          // Sucesso
-          setModalType("success");
-          setModalMessage("Seu cadastro foi realizado com sucesso! Você já pode fazer login na plataforma.");
-          
-          // Limpar formulário após sucesso
-          setFormData({
-            name: "",
-            email: "",
-            password: "",
-            confirmPassword: "",
-            acceptTerms: false
-          });
-        } else {
-          // Simulando erro do servidor
-          throw new Error("O email informado já está em uso. Por favor, tente outro email.");
-        }
+        // Sucesso (aqui seria a integração com o backend)
+        setModalType("success");
+        setModalMessage(
+          "Sua senha foi atualizada com sucesso! Agora você pode fazer login com sua nova senha."
+        );
+        
+        // Limpar formulário após sucesso
+        setFormData({
+          password: "",
+          confirmPassword: "",
+        });
       } catch (error) {
-        console.error("Erro ao cadastrar:", error);
+        console.error("Erro ao redefinir senha:", error);
         setModalType("error");
-        setModalMessage(error instanceof Error ? error.message : "Ocorreu um erro ao processar seu cadastro. Tente novamente.");
+        setModalMessage("Ocorreu um erro ao atualizar sua senha. Por favor, tente novamente.");
       } finally {
         setIsSubmitting(false);
       }
@@ -172,61 +166,60 @@ export default function Register() {
   const closeModal = () => {
     setModalType(null);
     setModalMessage("");
+    
+    // Se o modal era de sucesso, redirecionar para login
+    if (modalType === "success") {
+      router.push('/login');
+    }
   };
+
+  // Renderizar tela de carregamento enquanto verifica o token
   
+  // Se o token for inválido, mostrar mensagem de erro
+  if (isTokenValid === false) {
+    return (
+      <div className={styles.pageContainer}>
+        <div className={styles.container}>
+          <div className={styles.formWrapper}>
+            <div className={styles.headerSection}>
+              <div className={styles.errorIcon}>
+                <AlertCircle size={50} color="#e53e3e" />
+              </div>
+              <h1 className={styles.title}>Link inválido</h1>
+              <p className={styles.subtitle}>
+                {errors.token || "Seu link de redefinição é inválido ou expirou"}
+              </p>
+              <Link href="/forgot-password" className={styles.requestNewLink}>
+                Solicitar um novo link
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.container}>
         <div className={styles.formWrapper}>
           <div className={styles.headerSection}>
-            <h1 className={styles.title}>Criar Conta</h1>
-            <p className={styles.subtitle}>Preencha os dados abaixo para se cadastrar</p>
+            <h1 className={styles.title}>Criar nova senha</h1>
+            <p className={styles.subtitle}>
+              Digite e confirme sua nova senha abaixo
+            </p>
           </div>
           
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.inputGroup}>
-              <label htmlFor="name" className={styles.label}>Nome completo</label>
-              <div className={styles.inputWrapper}>
-                <User size={18} className={styles.inputIcon} />
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="Digite seu nome completo"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className={errors.name ? styles.inputError : styles.input}
-                />
-              </div>
-              {errors.name && <p className={styles.errorText}>{errors.name}</p>}
-            </div>
-            
-            <div className={styles.inputGroup}>
-              <label htmlFor="email" className={styles.label}>Email</label>
-              <div className={styles.inputWrapper}>
-                <Mail size={18} className={styles.inputIcon} />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Digite seu email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={errors.email ? styles.inputError : styles.input}
-                />
-              </div>
-              {errors.email && <p className={styles.errorText}>{errors.email}</p>}
-            </div>
-            
-            <div className={styles.inputGroup}>
-              <label htmlFor="password" className={styles.label}>Senha</label>
+              <label htmlFor="password" className={styles.label}>Nova senha</label>
               <div className={styles.inputWrapper}>
                 <Lock size={18} className={styles.inputIcon} />
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Crie uma senha forte"
+                  placeholder="Digite sua nova senha"
                   value={formData.password}
                   onChange={handleChange}
                   className={errors.password ? styles.inputError : styles.input}
@@ -243,14 +236,14 @@ export default function Register() {
             </div>
             
             <div className={styles.inputGroup}>
-              <label htmlFor="confirmPassword" className={styles.label}>Confirmar senha</label>
+              <label htmlFor="confirmPassword" className={styles.label}>Confirmar nova senha</label>
               <div className={styles.inputWrapper}>
                 <Lock size={18} className={styles.inputIcon} />
                 <input
                   id="confirmPassword"
                   name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirme sua senha"
+                  placeholder="Confirme sua nova senha"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   className={errors.confirmPassword ? styles.inputError : styles.input}
@@ -266,18 +259,22 @@ export default function Register() {
               {errors.confirmPassword && <p className={styles.errorText}>{errors.confirmPassword}</p>}
             </div>
             
-            <div className={styles.checkboxGroup}>
-              <label className={styles.checkboxLabel}>
-                <input
-                  name="acceptTerms"
-                  type="checkbox"
-                  checked={formData.acceptTerms}
-                  onChange={handleChange}
-                  className={styles.checkbox}
-                />
-                <span>Eu li e aceito os <a href="/termos" className={styles.link}>Termos de Uso</a> e <a href="/privacidade" className={styles.link}>Política de Privacidade</a></span>
-              </label>
-              {errors.acceptTerms && <p className={styles.errorText}>{errors.acceptTerms}</p>}
+            <div className={styles.passwordRequirements}>
+              <p className={styles.requirementsTitle}>Sua senha deve conter:</p>
+              <ul className={styles.requirementsList}>
+                <li className={formData.password.length >= 6 ? styles.requirementMet : ''}>
+                  No mínimo 6 caracteres
+                </li>
+                <li className={/[A-Z]/.test(formData.password) ? styles.requirementMet : ''}>
+                  Pelo menos uma letra maiúscula
+                </li>
+                <li className={/[0-9]/.test(formData.password) ? styles.requirementMet : ''}>
+                  Pelo menos um número
+                </li>
+                <li className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? styles.requirementMet : ''}>
+                  Pelo menos um caractere especial
+                </li>
+              </ul>
             </div>
             
             <button 
@@ -288,17 +285,17 @@ export default function Register() {
               {isSubmitting ? (
                 <span className={styles.spinnerContainer}>
                   <span className={styles.spinner}></span>
-                  Processando...
+                  Atualizando...
                 </span>
               ) : (
-                "Criar conta"
+                "Atualizar senha"
               )}
             </button>
             
             <div className={styles.linkContainer}>
-              <span>Já tem uma conta?</span>
+              <span>Lembrou sua senha?</span>
               <Link href="/" className={styles.loginLink}>
-                Entrar
+                Voltar para o login
               </Link>
             </div>
           </form>

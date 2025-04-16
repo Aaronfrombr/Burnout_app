@@ -1,0 +1,381 @@
+.pageContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    background-color: #3a5bd5;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+  }
+  
+  .pageContainer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(62, 71, 99, 0.85); 
+    z-index: 1;
+  }
+  
+  .container {
+    width: 100%;
+    max-width: 450px;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    background-color: rgba(255, 255, 255, 0.95);
+    overflow: hidden;
+    position: relative;
+    z-index: 2; 
+    backdrop-filter: blur(5px); 
+  }
+  
+  .formWrapper {
+    padding: 32px;
+  }
+  
+  .headerSection {
+    text-align: center;
+    margin-bottom: 32px;
+    position: relative;
+  }
+  
+  .returnLinkContainer {
+    position: relative;
+    top: -12px;
+    left: 0;
+  }
+  
+  .returnLink {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #666;
+    font-size: 14px;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  
+  .returnLink:hover {
+    color: #4a6cf7;
+  }
+  
+  .title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 16px;
+    margin-top: 20px;
+  }
+  
+  .subtitle {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.5;
+    max-width: 90%;
+    margin: 0 auto;
+  }
+  
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  
+  .inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .inputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  
+  .inputIcon {
+    position: absolute;
+    left: 12px;
+    color: #666;
+  }
+  
+  .input, .inputError {
+    width: 100%;
+    padding: 12px 12px 12px 40px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 16px;
+    transition: all 0.2s ease;
+  }
+  
+  .input:focus {
+    outline: none;
+    border-color: #4a6cf7;
+    box-shadow: 0 0 0 2px rgba(74, 108, 247, 0.2);
+  }
+  
+  .inputError {
+    border-color: #e53e3e;
+  }
+  
+  .inputError:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(229, 62, 62, 0.2);
+  }
+  
+  .errorText {
+    font-size: 12px;
+    color: #e53e3e;
+    margin-top: 4px;
+  }
+  
+  .submitButton {
+    padding: 14px;
+    border-radius: 8px;
+    border: none;
+    background-color: #4a6cf7;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 8px;
+  }
+  
+  .submitButton:hover {
+    background-color: #3a5bd5;
+  }
+  
+  .submitButton:disabled {
+    background-color: #8da1f5;
+    cursor: not-allowed;
+  }
+  
+  .spinnerContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+  }
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .linkContainer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+  
+  .loginLink {
+    color: #4a6cf7;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  
+  .loginLink:hover {
+    text-decoration: underline;
+  }
+  
+  /* Estilos para os modais */
+  .modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .modalContainer {
+    width: 100%;
+    max-width: 420px;
+    background-color: white;
+    border-radius: 12px;
+    padding: 32px;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  .closeButton {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+  
+  .closeButton:hover {
+    background-color: #f5f5f5;
+    color: #333;
+  }
+  
+  .modalIcon {
+    margin-bottom: 16px;
+  }
+  
+  .successModal .modalIcon {
+    color: #38a169; 
+  }
+  
+  .errorModal .modalIcon {
+    color: #e53e3e; 
+  }
+  
+  .modalTitle {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .successModal .modalTitle {
+    color: #2f855a;
+  }
+  
+  .errorModal .modalTitle {
+    color: #c53030;
+  }
+  
+  .modalMessage {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 24px;
+    line-height: 1.5;
+    white-space: pre-line;
+  }
+  
+  .modalButton {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+  }
+  
+  .successModal .modalButton {
+    background-color: #38a169;
+    color: white;
+  }
+  
+  .successModal .modalButton:hover {
+    background-color: #2f855a;
+  }
+  
+  .errorModal .modalButton {
+    background-color: #e53e3e;
+    color: white;
+  }
+  
+  .errorModal .modalButton:hover {
+    background-color: #c53030;
+  }
+  
+  /* Responsividade */
+  @media (max-width: 768px) {
+    .container {
+      max-width: 100%;
+    }
+    
+    .formWrapper {
+      padding: 24px;
+    }
+    
+    .title {
+      font-size: 24px;
+    }
+    
+    .modalContainer {
+      padding: 24px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .formWrapper {
+      padding: 20px 16px;
+    }
+    
+    .input, .inputError {
+      padding: 10px 10px 10px 36px;
+      font-size: 14px;
+    }
+    
+    .inputIcon {
+      left: 10px;
+    }
+    
+    .submitButton {
+      padding: 12px;
+      font-size: 15px;
+    }
+    
+    .modalContainer {
+      padding: 20px 16px;
+    }
+    
+    .modalTitle {
+      font-size: 20px;
+    }
+    
+    .modalMessage {
+      font-size: 14px;
+    }
+  }
