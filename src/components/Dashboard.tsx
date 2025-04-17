@@ -12,8 +12,11 @@ import {
   ChartData,
   ChartOptions,
 } from "chart.js";
+import { Camera, Upload, Play, Square, Download, BarChart } from "lucide-react";
+import styles from '../styles/Dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
 
 export default function Dashboard() {
   const [data, setData] = useState<ChartData<"bar">>({
@@ -38,6 +41,7 @@ export default function Dashboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [mode, setMode] = useState<"singleImage" | "continuous">("singleImage");
   const dataPollingInterval = useRef<NodeJS.Timeout | null>(null);
+  const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     // Limpar intervalos quando o componente for desmontado
@@ -61,6 +65,9 @@ export default function Dashboard() {
       canvas.height = video.videoHeight;
       const ctx : any = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
+      
+      // Salvar a imagem para preview
+      setLastImageUrl(canvas.toDataURL('image/jpeg'));
       
       // Encerrar a stream após capturar
       stream.getTracks().forEach(track => track.stop());
@@ -204,6 +211,15 @@ export default function Dashboard() {
       
       // Incrementar contador de atualizações
       setTotalAnalyzed(prev => prev + 1);
+
+      // Capturar imagem para preview
+      if (mode === "continuous") {
+        try {
+          await captureImage();
+        } catch (error) {
+          console.error("Erro ao capturar preview:", error);
+        }
+      }
       
     } catch (error) {
       console.error("Erro ao buscar dados de emoções:", error);
@@ -228,7 +244,7 @@ export default function Dashboard() {
     };
     
     // Gerar cores com base nas emoções
-    const colors = labels.map(label => colorMap[label] || "rgba(128, 128, 128, 0.8)");
+    const colors = labels.map(label => colorMap[label.toLowerCase()] || "rgba(128, 128, 128, 0.8)");
     
     const updatedData = {
       labels: labels,
@@ -288,135 +304,192 @@ export default function Dashboard() {
     },
     animation: {
       duration: 500
-    }
+    },
+    maintainAspectRatio: false
+  };
+
+  const getEmotionText = () => {
+    if (!data.labels || data.labels.length === 0) return "Nenhuma emoção detectada";
+    
+    let highestIndex = 0;
+    let highestValue = 0;
+    
+    data.datasets[0].data.forEach((value: any, index) => {
+      if (value > highestValue) {
+        highestValue = value as number;
+        highestIndex = index;
+      }
+    });
+    
+    if (highestValue === 0) return "Nenhuma emoção predominante";
+    
+    return `Emoção predominante: ${data.labels[highestIndex]}`;
   };
 
   return (
-    <div style={{ padding: "2rem", backgroundColor: "#f0f4f8", minHeight: "100vh" }}>
-      <h1 style={{ color: "#1e90ff", marginBottom: "1.5rem" }}>Análise de Expressões Faciais</h1>
-      
-      <div style={{ marginBottom: "1.5rem" }}>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button 
-            onClick={() => setMode("singleImage")}
-            style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: mode === "singleImage" ? "#1e90ff" : "#e0e0e0",
-              color: mode === "singleImage" ? "white" : "black",
-              cursor: "pointer"
-            }}
-          >
-            Imagem Única
-          </button>
-          <button 
-            onClick={() => setMode("continuous")}
-            style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: mode === "continuous" ? "#1e90ff" : "#e0e0e0",
-              color: mode === "continuous" ? "white" : "black",
-              cursor: "pointer"
-            }}
-          >
-            Análise Contínua
-          </button>
-        </div>
-      </div>
-
-      {/* Controles baseados no modo selecionado */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        {mode === "singleImage" ? (
-          <button
-            onClick={analyzeSingleImage}
-            disabled={isLoading}
-            style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: isLoading ? "#cccccc" : "#1e90ff",
-              color: "white",
-              cursor: isLoading ? "default" : "pointer"
-            }}
-          >
-            {isLoading ? "Analisando..." : "Capturar e Analisar"}
-          </button>
-        ) : (
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button
-              onClick={startContinuousAnalysis}
-              disabled={isLoading || isAnalyzing}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: (isLoading || isAnalyzing) ? "#cccccc" : "#1e90ff",
-                color: "white",
-                cursor: (isLoading || isAnalyzing) ? "default" : "pointer"
-              }}
-            >
-              {isLoading ? "Iniciando..." : "Iniciar Análise"}
-            </button>
-            <button
-              onClick={stopContinuousAnalysis}
-              disabled={!isAnalyzing || isLoading}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: (!isAnalyzing || isLoading) ? "#cccccc" : "#ff4d4d",
-                color: "white",
-                cursor: (!isAnalyzing || isLoading) ? "default" : "pointer"
-              }}
-            >
-              Parar Análise
-            </button>
+    <div className={styles.dashboardContainer}>
+      {/* Header */}
+      <header className={styles.header}>
+        <div className={styles.headerContent}>
+          <h1 className={styles.title}>
+            <BarChart className={styles.titleIcon} size={28} />
+            Análise de Expressões Faciais
+          </h1>
+          <div className={styles.statusBadge}>
+            {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
           </div>
-        )}
-        
-        {/* Botão de exportar dados */}
-        <button
-          onClick={exportData}
-          disabled={!data.labels || data.labels.length === 0}
-          style={{
-            marginLeft: "10px",
-            padding: "0.5rem 1rem",
-            borderRadius: "6px",
-            border: "none",
-            backgroundColor: (!data.labels || data.labels.length === 0) ? "#cccccc" : "#4CAF50",
-            color: "white",
-            cursor: (!data.labels || data.labels.length === 0) ? "default" : "pointer"
-          }}
-        >
-          Exportar CSV
-        </button>
-      </div>
-
-      {/* Mensagens de status */}
-      {isAnalyzing && (
-        <div style={{ marginBottom: "1rem", color: "#1e90ff" }}>
-          Análise em andamento... (Atualizações: {totalAnalyzed})
         </div>
-      )}
-      
-      {errorMessage && (
-        <div style={{ marginBottom: "1rem", color: "#ff4d4d" }}>
-          {errorMessage}
-        </div>
-      )}
+      </header>
 
-      {/* Gráfico de resultados */}
-      <div style={{
-        backgroundColor: "white",
-        padding: "1.5rem",
-        borderRadius: "8px",
-        boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-        maxWidth: "800px",
-        margin: "0 auto"
-      }}>
-        <Bar data={data} options={options} />
+      <div className={styles.container}>
+        <div className={styles.gridLayout}>
+          {/* Painel de controle */}
+          <div className={styles.controlPanel}>
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Painel de Controle</h2>
+              
+              {/* Modo de análise */}
+              <div className={styles.controlSection}>
+                <h3 className={styles.sectionTitle}>Modo de Análise</h3>
+                <div className={styles.buttonGrid}>
+                  <button 
+                    onClick={() => setMode("singleImage")}
+                    className={`${styles.modeButton} ${mode === "singleImage" ? styles.activeButton : ''}`}
+                  >
+                    <Camera className={styles.buttonIcon} size={18} />
+                    <span>Imagem Única</span>
+                  </button>
+                  <button 
+                    onClick={() => setMode("continuous")}
+                    className={`${styles.modeButton} ${mode === "continuous" ? styles.activeButton : ''}`}
+                  >
+                    <Upload className={styles.buttonIcon} size={18} />
+                    <span>Análise Contínua</span>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Controles de análise */}
+              <div className={styles.controlSection}>
+                <h3 className={styles.sectionTitle}>Controles</h3>
+                
+                {mode === "singleImage" ? (
+                  <button
+                    onClick={analyzeSingleImage}
+                    disabled={isLoading}
+                    className={`${styles.actionButton} ${styles.primaryButton} ${isLoading ? styles.disabledButton : ''}`}
+                  >
+                    <Camera className={styles.buttonIcon} size={18} />
+                    {isLoading ? "Analisando..." : "Capturar e Analisar"}
+                  </button>
+                ) : (
+                  <div className={styles.buttonGrid}>
+                    <button
+                      onClick={startContinuousAnalysis}
+                      disabled={isLoading || isAnalyzing}
+                      className={`${styles.actionButton} ${styles.successButton} ${(isLoading || isAnalyzing) ? styles.disabledButton : ''}`}
+                    >
+                      <Play className={styles.buttonIcon} size={18} />
+                      {isLoading ? "Iniciando..." : "Iniciar"}
+                    </button>
+                    <button
+                      onClick={stopContinuousAnalysis}
+                      disabled={!isAnalyzing || isLoading}
+                      className={`${styles.actionButton} ${styles.dangerButton} ${(!isAnalyzing || isLoading) ? styles.disabledButton : ''}`}
+                    >
+                      <Square className={styles.buttonIcon} size={18} />
+                      Parar
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Exportar dados */}
+              <div className={styles.controlSection}>
+                <h3 className={styles.sectionTitle}>Exportação</h3>
+                <button
+                  onClick={exportData}
+                  disabled={!data.labels || data.labels.length === 0}
+                  className={`${styles.actionButton} ${styles.secondaryButton} ${(!data.labels || data.labels.length === 0) ? styles.disabledButton : ''}`}
+                >
+                  <Download className={styles.buttonIcon} size={18} />
+                  Exportar CSV
+                </button>
+              </div>
+
+              {/* Status */}
+              {isAnalyzing && (
+                <div className={styles.statusPanel}>
+                  <h3 className={styles.statusTitle}>Status da Análise</h3>
+                  <div className={styles.statusInfo}>
+                    <span>Frames analisados:</span>
+                    <span className={styles.statusValue}>{totalAnalyzed}</span>
+                  </div>
+                  <div className={styles.progressBar}>
+                    <div className={styles.progressValue}></div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Mensagens de erro */}
+              {errorMessage && (
+                <div className={styles.errorMessage}>
+                  <p className={styles.errorText}>
+                    <span className={styles.errorIcon}>⚠️</span>
+                    {errorMessage}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Preview da Imagem */}
+            {lastImageUrl && (
+              <div className={styles.card}>
+                <h2 className={styles.cardTitle}>Última Captura</h2>
+                <div className={styles.imagePreview}>
+                  <img src={lastImageUrl} alt="Preview" className={styles.previewImage} />
+                  <div className={styles.imageOverlay}>
+                    {getEmotionText()}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Gráfico de resultados */}
+          <div className={styles.resultsPanel}>
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Resultados da Análise</h2>
+              
+              <div className={styles.chartContainer}>
+                <Bar data={data} options={options} />
+              </div>
+              
+              {/* Legenda personalizada */}
+              <div className={styles.legendGrid}>
+                {data.labels && data.labels.map((label: any, index: any) => (
+                  <div key={index} className={styles.legendItem}>
+                    <div 
+                      className={styles.colorIndicator} 
+                      style={{ backgroundColor: (data.datasets[0].backgroundColor as string[])[index] }}
+
+                    ></div>
+                    <span className={styles.legendLabel}>{label}</span>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Info sobre a análise */}
+              <div className={styles.infoPanel}>
+                <h3 className={styles.infoTitle}>Sobre a Análise</h3>
+                <p className={styles.infoText}>
+                  Este sistema detecta expressões faciais em tempo real usando visão computacional.
+                  As emoções são classificadas com base nos padrões faciais detectados.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
