@@ -207,7 +207,6 @@
     text-decoration: underline;
   }
   
-  /* Estilos para os modais */
   .modalOverlay {
     position: fixed;
     top: 0;
@@ -329,7 +328,6 @@
     background-color: #c53030;
   }
   
-  /* Responsividade */
   @media (max-width: 768px) {
     .container {
       max-width: 100%;

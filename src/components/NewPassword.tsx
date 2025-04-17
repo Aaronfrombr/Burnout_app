@@ -59,22 +59,16 @@ export default function ResetPassword() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
   
-  // Estados para o modal
   const [modalType, setModalType] = useState<ModalType>(null);
   const [modalMessage, setModalMessage] = useState("");
   
-  // Verificar token ao carregar
   useEffect(() => {
     if (token) {
-      // Aqui você verificaria a validade do token com seu backend
-      // Simulação
       const validateToken = async () => {
         try {
           console.log("Validando token:", token);
-          // Simular chamada de API
           await new Promise(resolve => setTimeout(resolve, 800));
           
-          // Para fins de demonstração, considere o token válido se tiver mais de 10 caracteres
           if (typeof token === 'string' && token.length > 10) {
             setIsTokenValid(true);
           } else {
@@ -104,7 +98,6 @@ export default function ResetPassword() {
       [name]: value
     }));
     
-    // Limpa o erro do campo quando o usuário começa a digitar
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = {...prev};
@@ -148,7 +141,6 @@ export default function ResetPassword() {
           "Sua senha foi atualizada com sucesso! Agora você pode fazer login com sua nova senha."
         );
         
-        // Limpar formulário após sucesso
         setFormData({
           password: "",
           confirmPassword: "",
@@ -173,9 +165,6 @@ export default function ResetPassword() {
     }
   };
 
-  // Renderizar tela de carregamento enquanto verifica o token
-  
-  // Se o token for inválido, mostrar mensagem de erro
   if (isTokenValid === false) {
     return (
       <div className={styles.pageContainer}>

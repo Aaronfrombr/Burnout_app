@@ -13,10 +13,8 @@ interface ModalProps {
 
 const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
   useEffect(() => {
-    // Impede rolagem do corpo quando o modal está aberto
     document.body.style.overflow = "hidden";
     
-    // Listener para tecla ESC fechar o modal
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
@@ -76,7 +74,6 @@ export default function Register() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Estados para o modal
   const [modalType, setModalType] = useState<ModalType>(null);
   const [modalMessage, setModalMessage] = useState("");
   
@@ -89,7 +86,6 @@ export default function Register() {
       [name]: newValue
     }));
     
-    // Limpa o erro do campo quando o usuário começa a digitar
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = {...prev};

@@ -357,7 +357,6 @@
     background-color: #c53030;
   }
   
-  /* Responsividade */
   @media (max-width: 768px) {
     .container {
       max-width: 100%;

@@ -44,7 +44,6 @@ export default function Dashboard() {
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // Limpar intervalos quando o componente for desmontado
     return () => {
       if (dataPollingInterval.current) {
         clearInterval(dataPollingInterval.current);
@@ -52,7 +51,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Função para capturar imagem da webcam
   const captureImage = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -66,10 +64,8 @@ export default function Dashboard() {
       const ctx : any = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
       
-      // Salvar a imagem para preview
       setLastImageUrl(canvas.toDataURL('image/jpeg'));
       
-      // Encerrar a stream após capturar
       stream.getTracks().forEach(track => track.stop());
       
       return new Promise<Blob>((resolve: any) => {
@@ -88,7 +84,6 @@ export default function Dashboard() {
       setIsLoading(true);
       setErrorMessage("");
       
-      // Capturar imagem da webcam
       const imageBlob = await captureImage();
       
       // Enviar para o backend
@@ -107,13 +102,11 @@ export default function Dashboard() {
       const result = await response.json();
       console.log("Resultado da análise:", result);
 
-      // Se não houver resultados, mostrar mensagem
       if (Object.keys(result).length === 0) {
         setErrorMessage("Nenhuma emoção detectada na imagem");
         return;
       }
 
-      // Atualizar o gráfico com os dados recebidos
       updateChartData(result);
       
     } catch (error) {
@@ -124,13 +117,11 @@ export default function Dashboard() {
     }
   };
 
-  // Iniciar análise contínua
   const startContinuousAnalysis = async () => {
     try {
       setIsLoading(true);
       setErrorMessage("");
       
-      // Chamar o endpoint para iniciar a análise contínua no backend
       const response = await fetch("http://localhost:8000/start-continuous-analysis/", {
         method: "POST",
       });
@@ -142,7 +133,6 @@ export default function Dashboard() {
       const result = await response.json();
       console.log(result.message);
       
-      // Iniciar polling para obter dados atualizados a cada 2 segundos
       setIsAnalyzing(true);
       setTotalAnalyzed(0);
       
@@ -160,18 +150,15 @@ export default function Dashboard() {
     }
   };
 
-  // Parar análise contínua
   const stopContinuousAnalysis = async () => {
     try {
       setIsLoading(true);
       
-      // Parar o polling de dados
       if (dataPollingInterval.current) {
         clearInterval(dataPollingInterval.current);
         dataPollingInterval.current = null;
       }
       
-      // Chamar o endpoint para parar a análise no backend
       const response = await fetch("http://localhost:8000/stop-continuous-analysis/", {
         method: "POST",
       });
@@ -183,7 +170,6 @@ export default function Dashboard() {
       const result = await response.json();
       console.log(result.message);
       
-      // Fazer uma última atualização dos dados
       await fetchEmotionData();
       
       setIsAnalyzing(false);
@@ -197,7 +183,6 @@ export default function Dashboard() {
     }
   };
 
-  // Obter dados atualizados de emoções do servidor
   const fetchEmotionData = async () => {
     try {
       const response = await fetch("http://localhost:8000/get-emotion-data/");
@@ -209,10 +194,8 @@ export default function Dashboard() {
       const emotionData = await response.json();
       updateChartData(emotionData);
       
-      // Incrementar contador de atualizações
       setTotalAnalyzed(prev => prev + 1);
 
-      // Capturar imagem para preview
       if (mode === "continuous") {
         try {
           await captureImage();
@@ -223,16 +206,13 @@ export default function Dashboard() {
       
     } catch (error) {
       console.error("Erro ao buscar dados de emoções:", error);
-      // Não mostramos o erro na interface para não interromper a análise contínua
     }
   };
 
-  // Atualizar o gráfico com novos dados
   const updateChartData = (emotionData: Record<string, number>) => {
     const labels = Object.keys(emotionData);
     const values = Object.values(emotionData);
     
-    // Mapeamento de cores para emoções
     const colorMap: Record<string, string> = {
       "felicidade": "rgba(75, 192, 75, 0.8)",    // Verde
       "tristeza": "rgba(54, 162, 235, 0.8)",     // Azul
@@ -243,7 +223,6 @@ export default function Dashboard() {
       "neutro": "rgba(169, 169, 169, 0.8)",      // Cinza
     };
     
-    // Gerar cores com base nas emoções
     const colors = labels.map(label => colorMap[label.toLowerCase()] || "rgba(128, 128, 128, 0.8)");
     
     const updatedData = {
@@ -260,7 +239,6 @@ export default function Dashboard() {
     setData(updatedData);
   };
 
-  // Exportar dados para CSV
   const exportData = () => {
     if (!data.labels || !data.datasets[0].data) return;
     
@@ -328,7 +306,6 @@ export default function Dashboard() {
 
   return (
     <div className={styles.dashboardContainer}>
-      {/* Header */}
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <h1 className={styles.title}>
@@ -343,12 +320,10 @@ export default function Dashboard() {
 
       <div className={styles.container}>
         <div className={styles.gridLayout}>
-          {/* Painel de controle */}
           <div className={styles.controlPanel}>
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Painel de Controle</h2>
               
-              {/* Modo de análise */}
               <div className={styles.controlSection}>
                 <h3 className={styles.sectionTitle}>Modo de Análise</h3>
                 <div className={styles.buttonGrid}>
@@ -369,7 +344,6 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              {/* Controles de análise */}
               <div className={styles.controlSection}>
                 <h3 className={styles.sectionTitle}>Controles</h3>
                 
@@ -404,7 +378,6 @@ export default function Dashboard() {
                 )}
               </div>
               
-              {/* Exportar dados */}
               <div className={styles.controlSection}>
                 <h3 className={styles.sectionTitle}>Exportação</h3>
                 <button
@@ -417,7 +390,6 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* Status */}
               {isAnalyzing && (
                 <div className={styles.statusPanel}>
                   <h3 className={styles.statusTitle}>Status da Análise</h3>
@@ -431,7 +403,6 @@ export default function Dashboard() {
                 </div>
               )}
               
-              {/* Mensagens de erro */}
               {errorMessage && (
                 <div className={styles.errorMessage}>
                   <p className={styles.errorText}>
@@ -442,7 +413,6 @@ export default function Dashboard() {
               )}
             </div>
             
-            {/* Preview da Imagem */}
             {lastImageUrl && (
               <div className={styles.card}>
                 <h2 className={styles.cardTitle}>Última Captura</h2>
@@ -456,7 +426,6 @@ export default function Dashboard() {
             )}
           </div>
           
-          {/* Gráfico de resultados */}
           <div className={styles.resultsPanel}>
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Resultados da Análise</h2>
@@ -465,7 +434,6 @@ export default function Dashboard() {
                 <Bar data={data} options={options} />
               </div>
               
-              {/* Legenda personalizada */}
               <div className={styles.legendGrid}>
                 {data.labels && data.labels.map((label: any, index: any) => (
                   <div key={index} className={styles.legendItem}>
@@ -479,7 +447,6 @@ export default function Dashboard() {
                 ))}
               </div>
               
-              {/* Info sobre a análise */}
               <div className={styles.infoPanel}>
                 <h3 className={styles.infoTitle}>Sobre a Análise</h3>
                 <p className={styles.infoText}>
