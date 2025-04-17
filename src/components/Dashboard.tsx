@@ -295,7 +295,6 @@ export default function Dashboard() {
     <div style={{ padding: "2rem", backgroundColor: "#f0f4f8", minHeight: "100vh" }}>
       <h1 style={{ color: "#1e90ff", marginBottom: "1.5rem" }}>Análise de Expressões Faciais</h1>
       
-      {/* Seleção de modo */}
       <div style={{ marginBottom: "1.5rem" }}>
         <div style={{ display: "flex", gap: "10px" }}>
           <button 
