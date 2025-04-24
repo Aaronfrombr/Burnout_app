@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import Link from "next/link";
 import styles from "../styles/Forgot.module.css";
 import { Mail, ArrowLeft, CheckCircle, AlertCircle, X } from "lucide-react";
+import Head from "next/head";
 
 type ModalType = "success" | "error" | null;
 
@@ -111,72 +112,73 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.container}>
-        <div className={styles.formWrapper}>
-          <div className={styles.headerSection}>
-            <div className={styles.returnLinkContainer}>
-              <Link href="/" className={styles.returnLink}>
-                <ArrowLeft size={16} />
-                <span>Voltar para login</span>
-              </Link>
-            </div>
-            <h1 className={styles.title}>Esqueceu a senha?</h1>
-            <p className={styles.subtitle}>
-              Digite seu email e enviaremos um link para você redefinir sua senha
-            </p>
-          </div>
-          
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.inputGroup}>
-              <label htmlFor="email" className={styles.label}>Email</label>
-              <div className={styles.inputWrapper}>
-                <Mail size={18} className={styles.inputIcon} />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Digite seu email cadastrado"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={errors.email ? styles.inputError : styles.input}
-                />
+    <><Head>
+      <title>WellBeing - Esqueci a Senha</title>
+      <link rel="icon" href="/image/logo.png" />
+    </Head><div className={styles.pageContainer}>
+        <div className={styles.container}>
+          <div className={styles.formWrapper}>
+            <div className={styles.headerSection}>
+              <div className={styles.returnLinkContainer}>
+                <Link href="/" className={styles.returnLink}>
+                  <ArrowLeft size={16} />
+                  <span>Voltar para login</span>
+                </Link>
               </div>
-              {errors.email && <p className={styles.errorText}>{errors.email}</p>}
+              <h1 className={styles.title}>Esqueceu a senha?</h1>
+              <p className={styles.subtitle}>
+                Digite seu email e enviaremos um link para você redefinir sua senha
+              </p>
             </div>
-            
-            <button 
-              type="submit" 
-              className={styles.submitButton}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <span className={styles.spinnerContainer}>
-                  <span className={styles.spinner}></span>
-                  Enviando...
-                </span>
-              ) : (
-                "Enviar link de redefinição"
-              )}
-            </button>
-            
-            <div className={styles.linkContainer}>
-              <span>Lembrou sua senha?</span>
-              <Link href="/" className={styles.loginLink}>
-                Voltar para o login
-              </Link>
-            </div>
-          </form>
+
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="email" className={styles.label}>Email</label>
+                <div className={styles.inputWrapper}>
+                  <Mail size={18} className={styles.inputIcon} />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="Digite seu email cadastrado"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={errors.email ? styles.inputError : styles.input} />
+                </div>
+                {errors.email && <p className={styles.errorText}>{errors.email}</p>}
+              </div>
+
+              <button
+                type="submit"
+                className={styles.submitButton}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <span className={styles.spinnerContainer}>
+                    <span className={styles.spinner}></span>
+                    Enviando...
+                  </span>
+                ) : (
+                  "Enviar link de redefinição"
+                )}
+              </button>
+
+              <div className={styles.linkContainer}>
+                <span>Lembrou sua senha?</span>
+                <Link href="/" className={styles.loginLink}>
+                  Voltar para o login
+                </Link>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
-      
-      {modalType && (
-        <FeedbackModal 
-          type={modalType} 
-          message={modalMessage} 
-          onClose={closeModal} 
-        />
-      )}
-    </div>
+
+        {modalType && (
+          <FeedbackModal
+            type={modalType}
+            message={modalMessage}
+            onClose={closeModal} />
+        )}
+      </div></>
   );
 }

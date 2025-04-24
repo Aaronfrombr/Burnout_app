@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import styles from "../styles/Login.module.css";
+import Head from "next/head";
 
 export default function Report() {
   const [report, setReport] = useState<string>("");
@@ -11,18 +12,20 @@ export default function Report() {
   };
 
   return (
-    <div className={styles.container}>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <h1>Parecer do Psicólogo</h1>
-        <textarea
-          placeholder="Digite seu parecer sobre o paciente..."
-          value={report}
-          onChange={(e) => setReport(e.target.value)}
-          rows={5}
-          required
-        />
-        <button type="submit">Enviar Parecer</button>
-      </form>
-    </div>
+    <><Head>
+      <title>WellBeing - Reports</title>
+      <link rel="icon" href="/image/logo.png" />
+    </Head><div className={styles.container}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <h1>Parecer do Psicólogo</h1>
+          <textarea
+            placeholder="Digite seu parecer sobre o paciente..."
+            value={report}
+            onChange={(e) => setReport(e.target.value)}
+            rows={5}
+            required />
+          <button type="submit">Enviar Parecer</button>
+        </form>
+      </div></>
   );
 }

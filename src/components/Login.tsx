@@ -5,6 +5,7 @@ import { login } from "../models/api";
 import styles from '../styles/Login.module.css';
 import { Pacifico } from 'next/font/google';
 import Image from "next/image";
+import Head from 'next/head';
 
 const pacifico = Pacifico({
   weight: '400',
@@ -84,81 +85,80 @@ export default function Login() {
   };
 
   return (
-    <div className={styles.animatedContainer}>
-      <div className={styles.backgroundContainer}>
-        {backgroundImages.map((src, index) => (
-          <Image 
-            key={src}
-            src={src}
-            alt={`Background ${index + 1}`}
-            fill
-            quality={100}
-            priority={index === 0}
-            className={`${styles.backgroundImage} ${index === currentImageIndex ? styles.active : ''}`}
-          />
-        ))}
-        <div className={styles.backgroundOverlay}></div>
-        <div className={styles.topGradient}></div>
-        <div className={styles.bottomGradient}></div>
-        <div className={styles.leftGradient}></div>
-        <div className={styles.rightGradient}></div>
-      </div>
-      
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <h1 className={`${styles.title} ${pacifico.className}`}>
-          {title}
-          <span className={styles.cursor}>|</span>
-        </h1>
-        {error && <p className={styles.error}>{error}</p>}
-        
-        <div className={styles.inputGroup}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className={`${styles.input} ${error && !isValidEmail(email) ? styles.inputError : ''}`}
-          />
+    <><Head>
+      <title>WellBeing - Login</title>
+      <link rel="icon" href="/image/logo.png" />
+    </Head><div className={styles.animatedContainer}>
+        <div className={styles.backgroundContainer}>
+          {backgroundImages.map((src, index) => (
+            <Image
+              key={src}
+              src={src}
+              alt={`Background ${index + 1}`}
+              fill
+              quality={100}
+              priority={index === 0}
+              className={`${styles.backgroundImage} ${index === currentImageIndex ? styles.active : ''}`} />
+          ))}
+          <div className={styles.backgroundOverlay}></div>
+          <div className={styles.topGradient}></div>
+          <div className={styles.bottomGradient}></div>
+          <div className={styles.leftGradient}></div>
+          <div className={styles.rightGradient}></div>
         </div>
-        
-        <div className={styles.inputGroup}>
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className={styles.input}
-          />
-        </div>
-        
-        <div className={styles.rememberMe}>
-          <label className={styles.checkboxLabel}>
+
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <h1 className={`${styles.title} ${pacifico.className}`}>
+            {title}
+            <span className={styles.cursor}>|</span>
+          </h1>
+          {error && <p className={styles.error}>{error}</p>}
+
+          <div className={styles.inputGroup}>
             <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className={styles.checkboxInput}
-            />
-            <span className={styles.checkmark}></span>
-            Lembrar senha
-          </label>
-        </div>
-        
-        <button type="submit" disabled={isLoading} className={styles.submitButton}>
-          {isLoading ? (
-            <span className={styles.loading}></span>
-          ) : (
-            'Entrar'
-          )}
-        </button>
-        
-        <div className={styles.links}>
-          <Link href="/forgotpassword" className={styles.link}>Esqueceu sua senha?</Link>
-          <Link href="/register" className={styles.link}>Cadastrar-se</Link>
-        </div>
-      </form>
-    </div>
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className={`${styles.input} ${error && !isValidEmail(email) ? styles.inputError : ''}`} />
+          </div>
+
+          <div className={styles.inputGroup}>
+            <input
+              type="password"
+              placeholder="Senha"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className={styles.input} />
+          </div>
+
+          <div className={styles.rememberMe}>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className={styles.checkboxInput} />
+              <span className={styles.checkmark}></span>
+              Lembrar senha
+            </label>
+          </div>
+
+          <button type="submit" disabled={isLoading} className={styles.submitButton}>
+            {isLoading ? (
+              <span className={styles.loading}></span>
+            ) : (
+              'Entrar'
+            )}
+          </button>
+
+          <div className={styles.links}>
+            <Link href="/forgotpassword" className={styles.link}>Esqueceu sua senha?</Link>
+            <Link href="/register" className={styles.link}>Cadastrar-se</Link>
+          </div>
+        </form>
+      </div></>
   );
 }

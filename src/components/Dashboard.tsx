@@ -14,6 +14,7 @@ import {
 } from "chart.js";
 import { Camera, Upload, Play, Square, Download, BarChart } from "lucide-react";
 import styles from '../styles/Dashboard.module.css';
+import Head from "next/head";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -305,159 +306,162 @@ export default function Dashboard() {
   };
 
   return (
-    <div className={styles.dashboardContainer}>
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <h1 className={styles.title}>
-            <BarChart className={styles.titleIcon} size={28} />
-            Análise de Expressões Faciais
-          </h1>
-          <div className={styles.statusBadge}>
-            {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
+    <><Head>
+      <title>WellBeing - Dashboard</title>
+      <link rel="icon" href="/image/logo.png" />
+    </Head><div className={styles.dashboardContainer}>
+        <header className={styles.header}>
+          <div className={styles.headerContent}>
+            <h1 className={styles.title}>
+              <BarChart className={styles.titleIcon} size={28} />
+              Análise de Expressões Faciais
+            </h1>
+            <div className={styles.statusBadge}>
+              {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className={styles.container}>
-        <div className={styles.gridLayout}>
-          <div className={styles.controlPanel}>
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Painel de Controle</h2>
-              
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Modo de Análise</h3>
-                <div className={styles.buttonGrid}>
-                  <button 
-                    onClick={() => setMode("singleImage")}
-                    className={`${styles.modeButton} ${mode === "singleImage" ? styles.activeButton : ''}`}
-                  >
-                    <Camera className={styles.buttonIcon} size={18} />
-                    <span>Imagem Única</span>
-                  </button>
-                  <button 
-                    onClick={() => setMode("continuous")}
-                    className={`${styles.modeButton} ${mode === "continuous" ? styles.activeButton : ''}`}
-                  >
-                    <Upload className={styles.buttonIcon} size={18} />
-                    <span>Análise Contínua</span>
-                  </button>
-                </div>
-              </div>
-              
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Controles</h3>
-                
-                {mode === "singleImage" ? (
-                  <button
-                    onClick={analyzeSingleImage}
-                    disabled={isLoading}
-                    className={`${styles.actionButton} ${styles.primaryButton} ${isLoading ? styles.disabledButton : ''}`}
-                  >
-                    <Camera className={styles.buttonIcon} size={18} />
-                    {isLoading ? "Analisando..." : "Capturar e Analisar"}
-                  </button>
-                ) : (
+        <div className={styles.container}>
+          <div className={styles.gridLayout}>
+            <div className={styles.controlPanel}>
+              <div className={styles.card}>
+                <h2 className={styles.cardTitle}>Painel de Controle</h2>
+
+                <div className={styles.controlSection}>
+                  <h3 className={styles.sectionTitle}>Modo de Análise</h3>
                   <div className={styles.buttonGrid}>
                     <button
-                      onClick={startContinuousAnalysis}
-                      disabled={isLoading || isAnalyzing}
-                      className={`${styles.actionButton} ${styles.successButton} ${(isLoading || isAnalyzing) ? styles.disabledButton : ''}`}
+                      onClick={() => setMode("singleImage")}
+                      className={`${styles.modeButton} ${mode === "singleImage" ? styles.activeButton : ''}`}
                     >
-                      <Play className={styles.buttonIcon} size={18} />
-                      {isLoading ? "Iniciando..." : "Iniciar"}
+                      <Camera className={styles.buttonIcon} size={18} />
+                      <span>Imagem Única</span>
                     </button>
                     <button
-                      onClick={stopContinuousAnalysis}
-                      disabled={!isAnalyzing || isLoading}
-                      className={`${styles.actionButton} ${styles.dangerButton} ${(!isAnalyzing || isLoading) ? styles.disabledButton : ''}`}
+                      onClick={() => setMode("continuous")}
+                      className={`${styles.modeButton} ${mode === "continuous" ? styles.activeButton : ''}`}
                     >
-                      <Square className={styles.buttonIcon} size={18} />
-                      Parar
+                      <Upload className={styles.buttonIcon} size={18} />
+                      <span>Análise Contínua</span>
                     </button>
+                  </div>
+                </div>
+
+                <div className={styles.controlSection}>
+                  <h3 className={styles.sectionTitle}>Controles</h3>
+
+                  {mode === "singleImage" ? (
+                    <button
+                      onClick={analyzeSingleImage}
+                      disabled={isLoading}
+                      className={`${styles.actionButton} ${styles.primaryButton} ${isLoading ? styles.disabledButton : ''}`}
+                    >
+                      <Camera className={styles.buttonIcon} size={18} />
+                      {isLoading ? "Analisando..." : "Capturar e Analisar"}
+                    </button>
+                  ) : (
+                    <div className={styles.buttonGrid}>
+                      <button
+                        onClick={startContinuousAnalysis}
+                        disabled={isLoading || isAnalyzing}
+                        className={`${styles.actionButton} ${styles.successButton} ${(isLoading || isAnalyzing) ? styles.disabledButton : ''}`}
+                      >
+                        <Play className={styles.buttonIcon} size={18} />
+                        {isLoading ? "Iniciando..." : "Iniciar"}
+                      </button>
+                      <button
+                        onClick={stopContinuousAnalysis}
+                        disabled={!isAnalyzing || isLoading}
+                        className={`${styles.actionButton} ${styles.dangerButton} ${(!isAnalyzing || isLoading) ? styles.disabledButton : ''}`}
+                      >
+                        <Square className={styles.buttonIcon} size={18} />
+                        Parar
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.controlSection}>
+                  <h3 className={styles.sectionTitle}>Exportação</h3>
+                  <button
+                    onClick={exportData}
+                    disabled={!data.labels || data.labels.length === 0}
+                    className={`${styles.actionButton} ${styles.secondaryButton} ${(!data.labels || data.labels.length === 0) ? styles.disabledButton : ''}`}
+                  >
+                    <Download className={styles.buttonIcon} size={18} />
+                    Exportar CSV
+                  </button>
+                </div>
+
+                {isAnalyzing && (
+                  <div className={styles.statusPanel}>
+                    <h3 className={styles.statusTitle}>Status da Análise</h3>
+                    <div className={styles.statusInfo}>
+                      <span>Frames analisados:</span>
+                      <span className={styles.statusValue}>{totalAnalyzed}</span>
+                    </div>
+                    <div className={styles.progressBar}>
+                      <div className={styles.progressValue}></div>
+                    </div>
+                  </div>
+                )}
+
+                {errorMessage && (
+                  <div className={styles.errorMessage}>
+                    <p className={styles.errorText}>
+                      <span className={styles.errorIcon}>⚠️</span>
+                      {errorMessage}
+                    </p>
                   </div>
                 )}
               </div>
-              
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Exportação</h3>
-                <button
-                  onClick={exportData}
-                  disabled={!data.labels || data.labels.length === 0}
-                  className={`${styles.actionButton} ${styles.secondaryButton} ${(!data.labels || data.labels.length === 0) ? styles.disabledButton : ''}`}
-                >
-                  <Download className={styles.buttonIcon} size={18} />
-                  Exportar CSV
-                </button>
-              </div>
 
-              {isAnalyzing && (
-                <div className={styles.statusPanel}>
-                  <h3 className={styles.statusTitle}>Status da Análise</h3>
-                  <div className={styles.statusInfo}>
-                    <span>Frames analisados:</span>
-                    <span className={styles.statusValue}>{totalAnalyzed}</span>
+              {lastImageUrl && (
+                <div className={styles.card}>
+                  <h2 className={styles.cardTitle}>Última Captura</h2>
+                  <div className={styles.imagePreview}>
+                    <img src={lastImageUrl} alt="Preview" className={styles.previewImage} />
+                    <div className={styles.imageOverlay}>
+                      {getEmotionText()}
+                    </div>
                   </div>
-                  <div className={styles.progressBar}>
-                    <div className={styles.progressValue}></div>
-                  </div>
-                </div>
-              )}
-              
-              {errorMessage && (
-                <div className={styles.errorMessage}>
-                  <p className={styles.errorText}>
-                    <span className={styles.errorIcon}>⚠️</span>
-                    {errorMessage}
-                  </p>
                 </div>
               )}
             </div>
-            
-            {lastImageUrl && (
-              <div className={styles.card}>
-                <h2 className={styles.cardTitle}>Última Captura</h2>
-                <div className={styles.imagePreview}>
-                  <img src={lastImageUrl} alt="Preview" className={styles.previewImage} />
-                  <div className={styles.imageOverlay}>
-                    {getEmotionText()}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <div className={styles.resultsPanel}>
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Resultados da Análise</h2>
-              
-              <div className={styles.chartContainer}>
-                <Bar data={data} options={options} />
-              </div>
-              
-              <div className={styles.legendGrid}>
-                {data.labels && data.labels.map((label: any, index: any) => (
-                  <div key={index} className={styles.legendItem}>
-                    <div 
-                      className={styles.colorIndicator} 
-                      style={{ backgroundColor: (data.datasets[0].backgroundColor as string[])[index] }}
 
-                    ></div>
-                    <span className={styles.legendLabel}>{label}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className={styles.infoPanel}>
-                <h3 className={styles.infoTitle}>Sobre a Análise</h3>
-                <p className={styles.infoText}>
-                  Este sistema detecta expressões faciais em tempo real usando visão computacional.
-                  As emoções são classificadas com base nos padrões faciais detectados.
-                </p>
+            <div className={styles.resultsPanel}>
+              <div className={styles.card}>
+                <h2 className={styles.cardTitle}>Resultados da Análise</h2>
+
+                <div className={styles.chartContainer}>
+                  <Bar data={data} options={options} />
+                </div>
+
+                <div className={styles.legendGrid}>
+                  {data.labels && data.labels.map((label: any, index: any) => (
+                    <div key={index} className={styles.legendItem}>
+                      <div
+                        className={styles.colorIndicator}
+                        style={{ backgroundColor: (data.datasets[0].backgroundColor as string[])[index] }}
+
+                      ></div>
+                      <span className={styles.legendLabel}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.infoPanel}>
+                  <h3 className={styles.infoTitle}>Sobre a Análise</h3>
+                  <p className={styles.infoText}>
+                    Este sistema detecta expressões faciais em tempo real usando visão computacional.
+                    As emoções são classificadas com base nos padrões faciais detectados.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </div></>
   );
 }

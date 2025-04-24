@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import styles from "../styles/Register.module.css";
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, AlertCircle, X } from "lucide-react";
+import Head from "next/head";
 
 type ModalType = "success" | "error" | null;
 
@@ -171,143 +172,140 @@ export default function Register() {
   };
   
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.container}>
-        <div className={styles.formWrapper}>
-          <div className={styles.headerSection}>
-            <h1 className={styles.title}>Criar Conta</h1>
-            <p className={styles.subtitle}>Preencha os dados abaixo para se cadastrar</p>
+    <><Head>
+      <title>WellBeing - Registre-se</title>
+      <link rel="icon" href="/image/logo.png" />
+    </Head><div className={styles.pageContainer}>
+        <div className={styles.container}>
+          <div className={styles.formWrapper}>
+            <div className={styles.headerSection}>
+              <h1 className={styles.title}>Criar Conta</h1>
+              <p className={styles.subtitle}>Preencha os dados abaixo para se cadastrar</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="name" className={styles.label}>Nome completo</label>
+                <div className={styles.inputWrapper}>
+                  <User size={18} className={styles.inputIcon} />
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    placeholder="Digite seu nome completo"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={errors.name ? styles.inputError : styles.input} />
+                </div>
+                {errors.name && <p className={styles.errorText}>{errors.name}</p>}
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label htmlFor="email" className={styles.label}>Email</label>
+                <div className={styles.inputWrapper}>
+                  <Mail size={18} className={styles.inputIcon} />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="Digite seu email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={errors.email ? styles.inputError : styles.input} />
+                </div>
+                {errors.email && <p className={styles.errorText}>{errors.email}</p>}
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label htmlFor="password" className={styles.label}>Senha</label>
+                <div className={styles.inputWrapper}>
+                  <Lock size={18} className={styles.inputIcon} />
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Crie uma senha forte"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={errors.password ? styles.inputError : styles.input} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={styles.toggleButton}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.password && <p className={styles.errorText}>{errors.password}</p>}
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label htmlFor="confirmPassword" className={styles.label}>Confirmar senha</label>
+                <div className={styles.inputWrapper}>
+                  <Lock size={18} className={styles.inputIcon} />
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirme sua senha"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className={errors.confirmPassword ? styles.inputError : styles.input} />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className={styles.toggleButton}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className={styles.errorText}>{errors.confirmPassword}</p>}
+              </div>
+
+              <div className={styles.checkboxGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    name="acceptTerms"
+                    type="checkbox"
+                    checked={formData.acceptTerms}
+                    onChange={handleChange}
+                    className={styles.checkbox} />
+                  <span>Eu li e aceito os <a href="/termos" className={styles.link}>Termos de Uso</a> e <a href="/privacidade" className={styles.link}>Política de Privacidade</a></span>
+                </label>
+                {errors.acceptTerms && <p className={styles.errorText}>{errors.acceptTerms}</p>}
+              </div>
+
+              <button
+                type="submit"
+                className={styles.submitButton}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <span className={styles.spinnerContainer}>
+                    <span className={styles.spinner}></span>
+                    Processando...
+                  </span>
+                ) : (
+                  "Criar conta"
+                )}
+              </button>
+
+              <div className={styles.linkContainer}>
+                <span>Já tem uma conta?</span>
+                <Link href="/" className={styles.loginLink}>
+                  Entrar
+                </Link>
+              </div>
+            </form>
           </div>
-          
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.inputGroup}>
-              <label htmlFor="name" className={styles.label}>Nome completo</label>
-              <div className={styles.inputWrapper}>
-                <User size={18} className={styles.inputIcon} />
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="Digite seu nome completo"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className={errors.name ? styles.inputError : styles.input}
-                />
-              </div>
-              {errors.name && <p className={styles.errorText}>{errors.name}</p>}
-            </div>
-            
-            <div className={styles.inputGroup}>
-              <label htmlFor="email" className={styles.label}>Email</label>
-              <div className={styles.inputWrapper}>
-                <Mail size={18} className={styles.inputIcon} />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Digite seu email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={errors.email ? styles.inputError : styles.input}
-                />
-              </div>
-              {errors.email && <p className={styles.errorText}>{errors.email}</p>}
-            </div>
-            
-            <div className={styles.inputGroup}>
-              <label htmlFor="password" className={styles.label}>Senha</label>
-              <div className={styles.inputWrapper}>
-                <Lock size={18} className={styles.inputIcon} />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Crie uma senha forte"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={errors.password ? styles.inputError : styles.input}
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className={styles.toggleButton}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.password && <p className={styles.errorText}>{errors.password}</p>}
-            </div>
-            
-            <div className={styles.inputGroup}>
-              <label htmlFor="confirmPassword" className={styles.label}>Confirmar senha</label>
-              <div className={styles.inputWrapper}>
-                <Lock size={18} className={styles.inputIcon} />
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirme sua senha"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className={errors.confirmPassword ? styles.inputError : styles.input}
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className={styles.toggleButton}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.confirmPassword && <p className={styles.errorText}>{errors.confirmPassword}</p>}
-            </div>
-            
-            <div className={styles.checkboxGroup}>
-              <label className={styles.checkboxLabel}>
-                <input
-                  name="acceptTerms"
-                  type="checkbox"
-                  checked={formData.acceptTerms}
-                  onChange={handleChange}
-                  className={styles.checkbox}
-                />
-                <span>Eu li e aceito os <a href="/termos" className={styles.link}>Termos de Uso</a> e <a href="/privacidade" className={styles.link}>Política de Privacidade</a></span>
-              </label>
-              {errors.acceptTerms && <p className={styles.errorText}>{errors.acceptTerms}</p>}
-            </div>
-            
-            <button 
-              type="submit" 
-              className={styles.submitButton}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <span className={styles.spinnerContainer}>
-                  <span className={styles.spinner}></span>
-                  Processando...
-                </span>
-              ) : (
-                "Criar conta"
-              )}
-            </button>
-            
-            <div className={styles.linkContainer}>
-              <span>Já tem uma conta?</span>
-              <Link href="/" className={styles.loginLink}>
-                Entrar
-              </Link>
-            </div>
-          </form>
         </div>
-      </div>
-      
-      {modalType && (
-        <FeedbackModal 
-          type={modalType} 
-          message={modalMessage} 
-          onClose={closeModal} 
-        />
-      )}
-    </div>
+
+        {modalType && (
+          <FeedbackModal
+            type={modalType}
+            message={modalMessage}
+            onClose={closeModal} />
+        )}
+      </div></>
   );
 }

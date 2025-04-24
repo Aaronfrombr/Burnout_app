@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import styles from "../styles/NewPass.module.css";
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, X } from "lucide-react";
+import Head from "next/head";
 
 type ModalType = "success" | "error" | null;
 
@@ -189,115 +190,115 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.container}>
-        <div className={styles.formWrapper}>
-          <div className={styles.headerSection}>
-            <h1 className={styles.title}>Criar nova senha</h1>
-            <p className={styles.subtitle}>
-              Digite e confirme sua nova senha abaixo
-            </p>
+    <><Head>
+      <title>WellBeing - Nova Senha</title>
+      <link rel="icon" href="/image/logo.png" />
+    </Head><div className={styles.pageContainer}>
+        <div className={styles.container}>
+          <div className={styles.formWrapper}>
+            <div className={styles.headerSection}>
+              <h1 className={styles.title}>Criar nova senha</h1>
+              <p className={styles.subtitle}>
+                Digite e confirme sua nova senha abaixo
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="password" className={styles.label}>Nova senha</label>
+                <div className={styles.inputWrapper}>
+                  <Lock size={18} className={styles.inputIcon} />
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Digite sua nova senha"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={errors.password ? styles.inputError : styles.input} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={styles.toggleButton}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.password && <p className={styles.errorText}>{errors.password}</p>}
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label htmlFor="confirmPassword" className={styles.label}>Confirmar nova senha</label>
+                <div className={styles.inputWrapper}>
+                  <Lock size={18} className={styles.inputIcon} />
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirme sua nova senha"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className={errors.confirmPassword ? styles.inputError : styles.input} />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className={styles.toggleButton}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className={styles.errorText}>{errors.confirmPassword}</p>}
+              </div>
+
+              <div className={styles.passwordRequirements}>
+                <p className={styles.requirementsTitle}>Sua senha deve conter:</p>
+                <ul className={styles.requirementsList}>
+                  <li className={formData.password.length >= 6 ? styles.requirementMet : ''}>
+                    No mínimo 6 caracteres
+                  </li>
+                  <li className={/[A-Z]/.test(formData.password) ? styles.requirementMet : ''}>
+                    Pelo menos uma letra maiúscula
+                  </li>
+                  <li className={/[0-9]/.test(formData.password) ? styles.requirementMet : ''}>
+                    Pelo menos um número
+                  </li>
+                  <li className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? styles.requirementMet : ''}>
+                    Pelo menos um caractere especial
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                type="submit"
+                className={styles.submitButton}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <span className={styles.spinnerContainer}>
+                    <span className={styles.spinner}></span>
+                    Atualizando...
+                  </span>
+                ) : (
+                  "Atualizar senha"
+                )}
+              </button>
+
+              <div className={styles.linkContainer}>
+                <span>Lembrou sua senha?</span>
+                <Link href="/" className={styles.loginLink}>
+                  Voltar para o login
+                </Link>
+              </div>
+            </form>
           </div>
-          
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.inputGroup}>
-              <label htmlFor="password" className={styles.label}>Nova senha</label>
-              <div className={styles.inputWrapper}>
-                <Lock size={18} className={styles.inputIcon} />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Digite sua nova senha"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={errors.password ? styles.inputError : styles.input}
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className={styles.toggleButton}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.password && <p className={styles.errorText}>{errors.password}</p>}
-            </div>
-            
-            <div className={styles.inputGroup}>
-              <label htmlFor="confirmPassword" className={styles.label}>Confirmar nova senha</label>
-              <div className={styles.inputWrapper}>
-                <Lock size={18} className={styles.inputIcon} />
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirme sua nova senha"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className={errors.confirmPassword ? styles.inputError : styles.input}
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className={styles.toggleButton}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.confirmPassword && <p className={styles.errorText}>{errors.confirmPassword}</p>}
-            </div>
-            
-            <div className={styles.passwordRequirements}>
-              <p className={styles.requirementsTitle}>Sua senha deve conter:</p>
-              <ul className={styles.requirementsList}>
-                <li className={formData.password.length >= 6 ? styles.requirementMet : ''}>
-                  No mínimo 6 caracteres
-                </li>
-                <li className={/[A-Z]/.test(formData.password) ? styles.requirementMet : ''}>
-                  Pelo menos uma letra maiúscula
-                </li>
-                <li className={/[0-9]/.test(formData.password) ? styles.requirementMet : ''}>
-                  Pelo menos um número
-                </li>
-                <li className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? styles.requirementMet : ''}>
-                  Pelo menos um caractere especial
-                </li>
-              </ul>
-            </div>
-            
-            <button 
-              type="submit" 
-              className={styles.submitButton}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <span className={styles.spinnerContainer}>
-                  <span className={styles.spinner}></span>
-                  Atualizando...
-                </span>
-              ) : (
-                "Atualizar senha"
-              )}
-            </button>
-            
-            <div className={styles.linkContainer}>
-              <span>Lembrou sua senha?</span>
-              <Link href="/" className={styles.loginLink}>
-                Voltar para o login
-              </Link>
-            </div>
-          </form>
         </div>
-      </div>
-      
-      {modalType && (
-        <FeedbackModal 
-          type={modalType} 
-          message={modalMessage} 
-          onClose={closeModal} 
-        />
-      )}
-    </div>
+
+        {modalType && (
+          <FeedbackModal
+            type={modalType}
+            message={modalMessage}
+            onClose={closeModal} />
+        )}
+      </div></>
   );
 }
