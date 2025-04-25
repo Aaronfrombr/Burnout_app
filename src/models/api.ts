@@ -1,4 +1,6 @@
 export interface LoginResponse {
+    user(user: any): string;
+    message: string;
     success: boolean;
     token: string;
   }

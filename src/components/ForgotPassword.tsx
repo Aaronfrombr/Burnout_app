@@ -113,7 +113,7 @@ export default function ForgotPassword() {
 
   return (
     <><Head>
-      <title>WellBeing - Esqueci a Senha</title>
+      <title>WellBeing | Esqueci a Senha</title>
       <link rel="icon" href="/image/logo.png" />
     </Head><div className={styles.pageContainer}>
         <div className={styles.container}>

@@ -191,7 +191,7 @@ export default function ResetPassword() {
 
   return (
     <><Head>
-      <title>WellBeing - Nova Senha</title>
+      <title>WellBeing | Nova Senha</title>
       <link rel="icon" href="/image/logo.png" />
     </Head><div className={styles.pageContainer}>
         <div className={styles.container}>

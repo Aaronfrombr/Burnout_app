@@ -13,7 +13,7 @@ export default function Report() {
 
   return (
     <><Head>
-      <title>WellBeing - Reports</title>
+      <title>WellBeing | Reports</title>
       <link rel="icon" href="/image/logo.png" />
     </Head><div className={styles.container}>
         <form onSubmit={handleSubmit} className={styles.form}>

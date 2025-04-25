@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { Home } from "lucide-react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -44,6 +45,7 @@ export default function Dashboard() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLogged, setIsLogged] = useState(false);
   const [totalAnalyzed, setTotalAnalyzed] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [mode, setMode] = useState<"singleImage" | "continuous">("singleImage");
@@ -323,26 +325,40 @@ export default function Dashboard() {
       <Head>
         <title>WellBeing | Análise Facial em Tempo Real</title>
         <link rel="icon" href="/image/logo.png" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap"
-          rel="stylesheet"
-        />
-        <style>{`
-          body {
-            font-family: 'Poppins', sans-serif;
-          }
-        `}</style>
       </Head>
       <div className={styles.dashboardContainer}>
         <header className={styles.header}>
           <div className={styles.headerContent}>
             <h1 className={styles.title}>
+            <li className={styles.navItem} title="Home">
+                  <Home size={20} />
+                </li>
               <BarChart className={styles.titleIcon} size={28} />
               Insights Faciais | Emocional em Foco
             </h1>
-            <div className={styles.statusBadge}>
-              {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
-            </div>
+            <nav className={styles.navBar}>
+              <span className={styles.statusBadge}>
+                {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
+              </span>
+              <ul className={styles.navLinks}>
+
+                {isLogged ? (
+                  <>
+                  <li className={styles.navItem}>Sair</li>
+                  <li className={styles.navItem}>Bem-Vindo(a): "usuario"</li>
+                  </>
+                ) : (
+                  <>
+                    <li className={styles.navItem}>
+                      <a href="/">Entrar</a>
+                    </li>
+                    <li className={styles.navItem}>
+                      <a href="/register">Cadastrar</a>
+                    </li>
+                  </>
+                )}
+              </ul>
+            </nav>
           </div>
         </header>
 

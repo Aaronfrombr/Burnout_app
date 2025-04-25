@@ -1,4 +1,5 @@
 import { useState, FormEvent, useEffect } from "react";
+import { useRouter } from 'next/router';
 import Link from "next/link";
 import styles from "../styles/Register.module.css";
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, AlertCircle, X } from "lucide-react";
@@ -12,7 +13,7 @@ interface ModalProps {
   onClose: () => void;
 }
 
-const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
+export const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     
@@ -62,6 +63,7 @@ const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
 };
 
 export default function Register() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -129,21 +131,37 @@ export default function Register() {
   
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+  
     if (validateForm()) {
       setIsSubmitting(true);
-      
+  
       try {
-        console.log("Dados do formulário:", formData);
-        // Simulação de envio para o backend
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Simulando uma resposta bem-sucedida (aqui seria a integração com o backend)
-        if (Math.random() > 0.3) { // 70% de chance de sucesso para simulação
+        const response = await fetch("http://localhost:8000/register/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            confirmPassword: formData.confirmPassword
+          })
+        });
+      
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          throw new Error(`Resposta não-JSON: ${text}`);
+        }
+      
+        const data = await response.json();
+  
+        if (response.ok) {
           // Sucesso
           setModalType("success");
-          setModalMessage("Seu cadastro foi realizado com sucesso! Você já pode fazer login na plataforma.");
-          
+          setModalMessage(data.message);
+  
           // Limpar formulário após sucesso
           setFormData({
             name: "",
@@ -152,19 +170,26 @@ export default function Register() {
             confirmPassword: "",
             acceptTerms: false
           });
+
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 1000);
+          
         } else {
-          // Simulando erro do servidor
-          throw new Error("O email informado já está em uso. Por favor, tente outro email.");
+          // Erro
+          setModalType("error");
+          setModalMessage(data.detail || "Ocorreu um erro ao processar seu cadastro.");
         }
       } catch (error) {
         console.error("Erro ao cadastrar:", error);
         setModalType("error");
-        setModalMessage(error instanceof Error ? error.message : "Ocorreu um erro ao processar seu cadastro. Tente novamente.");
+        setModalMessage("Ocorreu um erro inesperado. Tente novamente.");
       } finally {
         setIsSubmitting(false);
       }
     }
   };
+  
   
   const closeModal = () => {
     setModalType(null);
@@ -173,7 +198,7 @@ export default function Register() {
   
   return (
     <><Head>
-      <title>WellBeing - Registre-se</title>
+      <title>WellBeing | Registre-se</title>
       <link rel="icon" href="/image/logo.png" />
     </Head><div className={styles.pageContainer}>
         <div className={styles.container}>
