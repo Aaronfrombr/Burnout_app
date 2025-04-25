@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import { useState, useEffect, useRef } from "react";
 import { Bar } from "react-chartjs-2";
 import {
@@ -13,11 +13,17 @@ import {
   ChartOptions,
 } from "chart.js";
 import { Camera, Upload, Play, Square, Download, BarChart } from "lucide-react";
-import styles from '../styles/Dashboard.module.css';
+import styles from "../styles/Dashboard.module.css";
 import Head from "next/head";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
-
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export default function Dashboard() {
   const [data, setData] = useState<ChartData<"bar">>({
@@ -27,15 +33,15 @@ export default function Dashboard() {
         label: "Emoções Detectadas",
         data: [0, 0, 0, 0],
         backgroundColor: [
-          "rgba(75, 192, 75, 0.8)",    // Verde para Felicidade
-          "rgba(54, 162, 235, 0.8)",   // Azul para Tristeza
-          "rgba(255, 99, 132, 0.8)",   // Vermelho para Raiva
-          "rgba(255, 99, 255, 0.8)",   // Magenta para Estresse
+          "rgba(75, 192, 75, 0.8)", // Verde para Felicidade
+          "rgba(54, 162, 235, 0.8)", // Azul para Tristeza
+          "rgba(255, 99, 132, 0.8)", // Vermelho para Raiva
+          "rgba(255, 99, 255, 0.8)", // Magenta para Estresse
         ],
       },
     ],
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [totalAnalyzed, setTotalAnalyzed] = useState(0);
@@ -55,22 +61,22 @@ export default function Dashboard() {
   const captureImage = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const video = document.createElement('video');
+      const video = document.createElement("video");
       video.srcObject = stream;
       await video.play();
-      
-      const canvas = document.createElement('canvas');
+
+      const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx : any = canvas.getContext('2d');
+      const ctx: any = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0);
-      
-      setLastImageUrl(canvas.toDataURL('image/jpeg'));
-      
-      stream.getTracks().forEach(track => track.stop());
-      
+
+      setLastImageUrl(canvas.toDataURL("image/jpeg"));
+
+      stream.getTracks().forEach((track) => track.stop());
+
       return new Promise<Blob>((resolve: any) => {
-        canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.9);
+        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
       });
     } catch (error) {
       console.error("Erro ao capturar imagem:", error);
@@ -84,9 +90,9 @@ export default function Dashboard() {
     try {
       setIsLoading(true);
       setErrorMessage("");
-      
+
       const imageBlob = await captureImage();
-      
+
       // Enviar para o backend
       const formData = new FormData();
       formData.append("file", imageBlob, "image.jpg");
@@ -95,11 +101,11 @@ export default function Dashboard() {
         method: "POST",
         body: formData,
       });
-      
+
       if (!response.ok) {
         throw new Error(`Erro na API: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log("Resultado da análise:", result);
 
@@ -109,10 +115,11 @@ export default function Dashboard() {
       }
 
       updateChartData(result);
-      
     } catch (error) {
       console.error("Erro ao analisar imagem:", error);
-      setErrorMessage("Erro ao analisar imagem. Verifique o console para detalhes.");
+      setErrorMessage(
+        "Erro ao analisar imagem. Verifique o console para detalhes."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -122,27 +129,29 @@ export default function Dashboard() {
     try {
       setIsLoading(true);
       setErrorMessage("");
-      
-      const response = await fetch("http://localhost:8000/start-continuous-analysis/", {
-        method: "POST",
-      });
-      
+
+      const response = await fetch(
+        "http://localhost:8000/start-continuous-analysis/",
+        {
+          method: "POST",
+        }
+      );
+
       if (!response.ok) {
         throw new Error(`Erro ao iniciar análise contínua: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log(result.message);
-      
+
       setIsAnalyzing(true);
       setTotalAnalyzed(0);
-      
+
       if (dataPollingInterval.current) {
         clearInterval(dataPollingInterval.current);
       }
-      
+
       dataPollingInterval.current = setInterval(fetchEmotionData, 2000);
-      
     } catch (error) {
       console.error("Erro ao iniciar análise contínua:", error);
       setErrorMessage("Erro ao iniciar a análise contínua");
@@ -154,27 +163,29 @@ export default function Dashboard() {
   const stopContinuousAnalysis = async () => {
     try {
       setIsLoading(true);
-      
+
       if (dataPollingInterval.current) {
         clearInterval(dataPollingInterval.current);
         dataPollingInterval.current = null;
       }
-      
-      const response = await fetch("http://localhost:8000/stop-continuous-analysis/", {
-        method: "POST",
-      });
-      
+
+      const response = await fetch(
+        "http://localhost:8000/stop-continuous-analysis/",
+        {
+          method: "POST",
+        }
+      );
+
       if (!response.ok) {
         throw new Error(`Erro ao parar análise: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log(result.message);
-      
+
       await fetchEmotionData();
-      
+
       setIsAnalyzing(false);
-      
     } catch (error) {
       console.error("Erro ao parar análise:", error);
       setErrorMessage("Erro ao parar a análise");
@@ -187,15 +198,15 @@ export default function Dashboard() {
   const fetchEmotionData = async () => {
     try {
       const response = await fetch("http://localhost:8000/get-emotion-data/");
-      
+
       if (!response.ok) {
         throw new Error(`Erro ao obter dados: ${response.status}`);
       }
-      
+
       const emotionData = await response.json();
       updateChartData(emotionData);
-      
-      setTotalAnalyzed(prev => prev + 1);
+
+      setTotalAnalyzed((prev) => prev + 1);
 
       if (mode === "continuous") {
         try {
@@ -204,7 +215,6 @@ export default function Dashboard() {
           console.error("Erro ao capturar preview:", error);
         }
       }
-      
     } catch (error) {
       console.error("Erro ao buscar dados de emoções:", error);
     }
@@ -213,19 +223,21 @@ export default function Dashboard() {
   const updateChartData = (emotionData: Record<string, number>) => {
     const labels = Object.keys(emotionData);
     const values = Object.values(emotionData);
-    
+
     const colorMap: Record<string, string> = {
-      "felicidade": "rgba(75, 192, 75, 0.8)",    // Verde
-      "tristeza": "rgba(54, 162, 235, 0.8)",     // Azul
-      "raiva": "rgba(255, 99, 132, 0.8)",        // Vermelho
-      "estresse": "rgba(255, 99, 255, 0.8)",     // Magenta
-      "nojo": "rgba(255, 206, 86, 0.8)",         // Amarelo
-      "surpresa": "rgba(75, 192, 192, 0.8)",     // Ciano
-      "neutro": "rgba(169, 169, 169, 0.8)",      // Cinza
+      felicidade: "rgba(75, 192, 75, 0.8)", // Verde
+      tristeza: "rgba(54, 162, 235, 0.8)", // Azul
+      raiva: "rgba(255, 99, 132, 0.8)", // Vermelho
+      estresse: "rgba(255, 99, 255, 0.8)", // Magenta
+      nojo: "rgba(255, 206, 86, 0.8)", // Amarelo
+      surpresa: "rgba(75, 192, 192, 0.8)", // Ciano
+      neutro: "rgba(169, 169, 169, 0.8)", // Cinza
     };
-    
-    const colors = labels.map(label => colorMap[label.toLowerCase()] || "rgba(128, 128, 128, 0.8)");
-    
+
+    const colors = labels.map(
+      (label) => colorMap[label.toLowerCase()] || "rgba(128, 128, 128, 0.8)"
+    );
+
     const updatedData = {
       labels: labels,
       datasets: [
@@ -236,27 +248,27 @@ export default function Dashboard() {
         },
       ],
     };
-    
+
     setData(updatedData);
   };
 
   const exportData = () => {
     if (!data.labels || !data.datasets[0].data) return;
-    
+
     const labels = data.labels;
     const values = data.datasets[0].data;
-    
+
     const csvContent = [
       "Emoção,Contagem",
-      ...labels.map((label, index) => `${label},${values[index]}`)
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      ...labels.map((label, index) => `${label},${values[index]}`),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'analise_emocoes.csv');
-    link.style.visibility = 'hidden';
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "analise_emocoes.csv");
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -264,57 +276,69 @@ export default function Dashboard() {
 
   const options: ChartOptions<"bar"> = {
     scales: {
-      y: { 
+      y: {
         beginAtZero: true,
         title: {
           display: true,
-          text: 'Contagem'
-        }
+          text: "Contagem",
+        },
       },
     },
     plugins: {
       title: {
         display: true,
-        text: 'Análise de Emoções'
+        text: "Análise de Emoções",
       },
       legend: {
-        display: false
-      }
+        display: false,
+      },
     },
     animation: {
-      duration: 500
+      duration: 500,
     },
-    maintainAspectRatio: false
+    maintainAspectRatio: false,
   };
 
   const getEmotionText = () => {
-    if (!data.labels || data.labels.length === 0) return "Nenhuma emoção detectada";
-    
+    if (!data.labels || data.labels.length === 0)
+      return "Nenhuma emoção detectada";
+
     let highestIndex = 0;
     let highestValue = 0;
-    
+
     data.datasets[0].data.forEach((value: any, index) => {
       if (value > highestValue) {
         highestValue = value as number;
         highestIndex = index;
       }
     });
-    
+
     if (highestValue === 0) return "Nenhuma emoção predominante";
-    
+
     return `Emoção predominante: ${data.labels[highestIndex]}`;
   };
 
   return (
-    <><Head>
-      <title>WellBeing - Dashboard</title>
-      <link rel="icon" href="/image/logo.png" />
-    </Head><div className={styles.dashboardContainer}>
+    <>
+      <Head>
+        <title>WellBeing | Análise Facial em Tempo Real</title>
+        <link rel="icon" href="/image/logo.png" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap"
+          rel="stylesheet"
+        />
+        <style>{`
+          body {
+            font-family: 'Poppins', sans-serif;
+          }
+        `}</style>
+      </Head>
+      <div className={styles.dashboardContainer}>
         <header className={styles.header}>
           <div className={styles.headerContent}>
             <h1 className={styles.title}>
               <BarChart className={styles.titleIcon} size={28} />
-              Análise de Expressões Faciais
+              Insights Faciais | Emocional em Foco
             </h1>
             <div className={styles.statusBadge}>
               {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
@@ -324,6 +348,7 @@ export default function Dashboard() {
 
         <div className={styles.container}>
           <div className={styles.gridLayout}>
+            {/* Coluna esquerda - Painel de Controle */}
             <div className={styles.controlPanel}>
               <div className={styles.card}>
                 <h2 className={styles.cardTitle}>Painel de Controle</h2>
@@ -333,14 +358,18 @@ export default function Dashboard() {
                   <div className={styles.buttonGrid}>
                     <button
                       onClick={() => setMode("singleImage")}
-                      className={`${styles.modeButton} ${mode === "singleImage" ? styles.activeButton : ''}`}
+                      className={`${styles.modeButton} ${
+                        mode === "singleImage" ? styles.activeButton : ""
+                      }`}
                     >
                       <Camera className={styles.buttonIcon} size={18} />
                       <span>Imagem Única</span>
                     </button>
                     <button
                       onClick={() => setMode("continuous")}
-                      className={`${styles.modeButton} ${mode === "continuous" ? styles.activeButton : ''}`}
+                      className={`${styles.modeButton} ${
+                        mode === "continuous" ? styles.activeButton : ""
+                      }`}
                     >
                       <Upload className={styles.buttonIcon} size={18} />
                       <span>Análise Contínua</span>
@@ -350,12 +379,13 @@ export default function Dashboard() {
 
                 <div className={styles.controlSection}>
                   <h3 className={styles.sectionTitle}>Controles</h3>
-
                   {mode === "singleImage" ? (
                     <button
                       onClick={analyzeSingleImage}
                       disabled={isLoading}
-                      className={`${styles.actionButton} ${styles.primaryButton} ${isLoading ? styles.disabledButton : ''}`}
+                      className={`${styles.actionButton} ${
+                        styles.primaryButton
+                      } ${isLoading ? styles.disabledButton : ""}`}
                     >
                       <Camera className={styles.buttonIcon} size={18} />
                       {isLoading ? "Analisando..." : "Capturar e Analisar"}
@@ -365,7 +395,11 @@ export default function Dashboard() {
                       <button
                         onClick={startContinuousAnalysis}
                         disabled={isLoading || isAnalyzing}
-                        className={`${styles.actionButton} ${styles.successButton} ${(isLoading || isAnalyzing) ? styles.disabledButton : ''}`}
+                        className={`${styles.actionButton} ${
+                          styles.successButton
+                        } ${
+                          isLoading || isAnalyzing ? styles.disabledButton : ""
+                        }`}
                       >
                         <Play className={styles.buttonIcon} size={18} />
                         {isLoading ? "Iniciando..." : "Iniciar"}
@@ -373,7 +407,11 @@ export default function Dashboard() {
                       <button
                         onClick={stopContinuousAnalysis}
                         disabled={!isAnalyzing || isLoading}
-                        className={`${styles.actionButton} ${styles.dangerButton} ${(!isAnalyzing || isLoading) ? styles.disabledButton : ''}`}
+                        className={`${styles.actionButton} ${
+                          styles.dangerButton
+                        } ${
+                          !isAnalyzing || isLoading ? styles.disabledButton : ""
+                        }`}
                       >
                         <Square className={styles.buttonIcon} size={18} />
                         Parar
@@ -387,7 +425,13 @@ export default function Dashboard() {
                   <button
                     onClick={exportData}
                     disabled={!data.labels || data.labels.length === 0}
-                    className={`${styles.actionButton} ${styles.secondaryButton} ${(!data.labels || data.labels.length === 0) ? styles.disabledButton : ''}`}
+                    className={`${styles.actionButton} ${
+                      styles.secondaryButton
+                    } ${
+                      !data.labels || data.labels.length === 0
+                        ? styles.disabledButton
+                        : ""
+                    }`}
                   >
                     <Download className={styles.buttonIcon} size={18} />
                     Exportar CSV
@@ -399,7 +443,9 @@ export default function Dashboard() {
                     <h3 className={styles.statusTitle}>Status da Análise</h3>
                     <div className={styles.statusInfo}>
                       <span>Frames analisados:</span>
-                      <span className={styles.statusValue}>{totalAnalyzed}</span>
+                      <span className={styles.statusValue}>
+                        {totalAnalyzed}
+                      </span>
                     </div>
                     <div className={styles.progressBar}>
                       <div className={styles.progressValue}></div>
@@ -416,52 +462,60 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+            </div>
 
+            {/* Coluna direita - Última Captura + Resultados */}
+            <div className={styles.resultsColumn}>
               {lastImageUrl && (
                 <div className={styles.card}>
                   <h2 className={styles.cardTitle}>Última Captura</h2>
                   <div className={styles.imagePreview}>
-                    <img src={lastImageUrl} alt="Preview" className={styles.previewImage} />
+                    <img
+                      src={lastImageUrl}
+                      alt="Preview"
+                      className={styles.previewImage}
+                    />
                     <div className={styles.imageOverlay}>
                       {getEmotionText()}
                     </div>
                   </div>
                 </div>
               )}
-            </div>
 
-            <div className={styles.resultsPanel}>
               <div className={styles.card}>
                 <h2 className={styles.cardTitle}>Resultados da Análise</h2>
-
                 <div className={styles.chartContainer}>
                   <Bar data={data} options={options} />
                 </div>
-
                 <div className={styles.legendGrid}>
-                  {data.labels && data.labels.map((label: any, index: any) => (
-                    <div key={index} className={styles.legendItem}>
-                      <div
-                        className={styles.colorIndicator}
-                        style={{ backgroundColor: (data.datasets[0].backgroundColor as string[])[index] }}
-
-                      ></div>
-                      <span className={styles.legendLabel}>{label}</span>
-                    </div>
-                  ))}
+                  {data.labels &&
+                    data.labels.map((label: any, index: any) => (
+                      <div key={index} className={styles.legendItem}>
+                        <div
+                          className={styles.colorIndicator}
+                          style={{
+                            backgroundColor: (
+                              data.datasets[0].backgroundColor as string[]
+                            )[index],
+                          }}
+                        ></div>
+                        <span className={styles.legendLabel}>{label}</span>
+                      </div>
+                    ))}
                 </div>
-
                 <div className={styles.infoPanel}>
                   <h3 className={styles.infoTitle}>Sobre a Análise</h3>
                   <p className={styles.infoText}>
-                    Este sistema detecta expressões faciais em tempo real usando visão computacional.
-                    As emoções são classificadas com base nos padrões faciais detectados.
+                    Este sistema detecta expressões faciais em tempo real usando
+                    visão computacional. As emoções são classificadas com base
+                    nos padrões faciais detectados.
                   </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div></>
+      </div>
+    </>
   );
 }

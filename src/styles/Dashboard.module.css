@@ -356,3 +356,32 @@
       grid-template-columns: repeat(2, 1fr);
     }
   }
+
+  .gridLayout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+  
+  .controlColumn {
+    flex: 1 1 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .resultsColumn {
+    flex: 2 1 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
