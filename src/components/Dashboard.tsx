@@ -28,16 +28,19 @@ ChartJS.register(
 
 export default function Dashboard() {
   const [data, setData] = useState<ChartData<"bar">>({
-    labels: ["Felicidade", "Tristeza", "Raiva", "Estresse"],
+    labels: ["felicidade", "tristeza", "raiva", "estresse", "nojo", "surpresa", "neutro"],
     datasets: [
       {
         label: "Emoções Detectadas",
-        data: [0, 0, 0, 0],
+        data: [0, 0, 0, 0, 0, 0, 0],
         backgroundColor: [
-          "rgba(75, 192, 75, 0.8)", // Verde para Felicidade
-          "rgba(54, 162, 235, 0.8)", // Azul para Tristeza
-          "rgba(255, 99, 132, 0.8)", // Vermelho para Raiva
-          "rgba(255, 99, 255, 0.8)", // Magenta para Estresse
+          "rgba(0, 255, 0, 0.8)",       // Verde para Felicidade
+          "rgba(255, 0, 0, 0.8)",        // Azul para Tristeza
+          "rgba(0, 0, 255, 0.8)",        // Vermelho para Raiva
+          "rgba(255, 0, 255, 0.8)",      // Magenta para Estresse
+          "rgba(0, 255, 255, 0.8)",      // Amarelo para Nojo
+          "rgba(255, 255, 0, 0.8)",      // Ciano para Surpresa
+          "rgba(200, 200, 200, 0.8)",   // Cinza para Neutro
         ],
       },
     ],
@@ -46,48 +49,124 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLogged, setIsLogged] = useState(false);
+  const [username, setUsername] = useState("");
   const [totalAnalyzed, setTotalAnalyzed] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [mode, setMode] = useState<"singleImage" | "continuous">("singleImage");
   const dataPollingInterval = useRef<NodeJS.Timeout | null>(null);
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
+    const checkServerStatus = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/health");
+        if (!response.ok) {
+          setErrorMessage("Servidor indisponível. Verifique a conexão.");
+        }
+      } catch (error) {
+        console.error("Erro ao verificar status do servidor:", error);
+        setErrorMessage("Servidor indisponível. Verifique a conexão.");
+      }
+    };
+
+    checkServerStatus();
+
+    const storedUser = sessionStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setIsLogged(true);
+        setUsername(userData.name);
+      } catch (e) {
+        console.error("Erro ao recuperar dados de usuário:", e);
+      }
+    }
+
     return () => {
       if (dataPollingInterval.current) {
         clearInterval(dataPollingInterval.current);
       }
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
   }, []);
 
-  const captureImage = async () => {
+  const setupVideoStream = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx: any = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0);
-
-      setLastImageUrl(canvas.toDataURL("image/jpeg"));
-
-      stream.getTracks().forEach((track) => track.stop());
-
-      return new Promise<Blob>((resolve: any) => {
-        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user"
+        } 
       });
+      
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      
+      return stream;
     } catch (error) {
-      console.error("Erro ao capturar imagem:", error);
-      setErrorMessage("Não foi possível acessar a câmera");
+      console.error("Erro ao acessar câmera:", error);
+      setErrorMessage("Não foi possível acessar a câmera. Verifique as permissões.");
       throw error;
     }
   };
 
-  // Análise de uma única imagem
+  const captureImage = async () => {
+    try {
+      let stream = streamRef.current;
+      if (!stream) {
+        stream = await setupVideoStream();
+      }
+      
+      let video = videoRef.current;
+      if (!video) {
+        video = document.createElement("video");
+        video.srcObject = stream;
+        await video.play();
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) {
+        throw new Error("Não foi possível criar contexto de canvas");
+      }
+      
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      setLastImageUrl(canvas.toDataURL("image/jpeg"));
+
+      return new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            throw new Error("Falha ao converter canvas para blob");
+          }
+        }, "image/jpeg", 0.9);
+      });
+    } catch (error) {
+      console.error("Erro ao capturar imagem:", error);
+      setErrorMessage("Não foi possível capturar imagem da câmera");
+      throw error;
+    }
+  };
+
   const analyzeSingleImage = async () => {
     try {
       setIsLoading(true);
@@ -95,7 +174,6 @@ export default function Dashboard() {
 
       const imageBlob = await captureImage();
 
-      // Enviar para o backend
       const formData = new FormData();
       formData.append("file", imageBlob, "image.jpg");
 
@@ -119,9 +197,7 @@ export default function Dashboard() {
       updateChartData(result);
     } catch (error) {
       console.error("Erro ao analisar imagem:", error);
-      setErrorMessage(
-        "Erro ao analisar imagem. Verifique o console para detalhes."
-      );
+      setErrorMessage("Erro ao analisar imagem. Verifique o console para detalhes.");
     } finally {
       setIsLoading(false);
     }
@@ -131,34 +207,66 @@ export default function Dashboard() {
     try {
       setIsLoading(true);
       setErrorMessage("");
-
+      
+      await setupVideoStream();
+  
       const response = await fetch(
         "http://localhost:8000/start-continuous-analysis/",
         {
           method: "POST",
         }
       );
-
+  
       if (!response.ok) {
         throw new Error(`Erro ao iniciar análise contínua: ${response.status}`);
       }
-
+  
       const result = await response.json();
       console.log(result.message);
-
+  
       setIsAnalyzing(true);
       setTotalAnalyzed(0);
-
+  
       if (dataPollingInterval.current) {
         clearInterval(dataPollingInterval.current);
       }
-
-      dataPollingInterval.current = setInterval(fetchEmotionData, 2000);
+  
+      // Atualizar mais rapidamente (a cada 300ms)
+      dataPollingInterval.current = setInterval(fetchEmotionData, 300);
+      
+      // Capturar imagem inicial
+      await captureImage();
     } catch (error) {
       console.error("Erro ao iniciar análise contínua:", error);
       setErrorMessage("Erro ao iniciar a análise contínua");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const captureFrame = async () => {
+    try {
+      if (!videoRef.current || !streamRef.current) return;
+      
+      const video = videoRef.current;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) return;
+      
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageUrl = canvas.toDataURL("image/jpeg");
+      setLastImageUrl(imageUrl);
+      
+      return new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+        }, "image/jpeg", 0.8);
+      });
+    } catch (error) {
+      console.error("Erro ao capturar frame:", error);
     }
   };
 
@@ -188,6 +296,11 @@ export default function Dashboard() {
       await fetchEmotionData();
 
       setIsAnalyzing(false);
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
     } catch (error) {
       console.error("Erro ao parar análise:", error);
       setErrorMessage("Erro ao parar a análise");
@@ -199,58 +312,51 @@ export default function Dashboard() {
 
   const fetchEmotionData = async () => {
     try {
-      const response = await fetch("http://localhost:8000/get-emotion-data/");
-
-      if (!response.ok) {
-        throw new Error(`Erro ao obter dados: ${response.status}`);
-      }
-
+      const [response, imageBlob] = await Promise.all([
+        fetch("http://localhost:8000/get-emotion-data/"),
+        captureFrame()
+      ]);
+      
+      if (!response.ok) throw new Error(`Erro: ${response.status}`);
+      
       const emotionData = await response.json();
+      console.log("Dados recebidos:", emotionData);
+      
       updateChartData(emotionData);
-
       setTotalAnalyzed((prev) => prev + 1);
-
-      if (mode === "continuous") {
-        try {
-          await captureImage();
-        } catch (error) {
-          console.error("Erro ao capturar preview:", error);
-        }
-      }
+      
     } catch (error) {
-      console.error("Erro ao buscar dados de emoções:", error);
+      console.error("Erro ao buscar dados:", error);
+      setErrorMessage("Erro ao receber dados da análise contínua");
     }
   };
 
   const updateChartData = (emotionData: Record<string, number>) => {
-    const labels = Object.keys(emotionData);
-    const values = Object.values(emotionData);
-
-    const colorMap: Record<string, string> = {
-      felicidade: "rgba(75, 192, 75, 0.8)", // Verde
-      tristeza: "rgba(54, 162, 235, 0.8)", // Azul
-      raiva: "rgba(255, 99, 132, 0.8)", // Vermelho
-      estresse: "rgba(255, 99, 255, 0.8)", // Magenta
-      nojo: "rgba(255, 206, 86, 0.8)", // Amarelo
-      surpresa: "rgba(75, 192, 192, 0.8)", // Ciano
-      neutro: "rgba(169, 169, 169, 0.8)", // Cinza
-    };
-
-    const colors = labels.map(
-      (label) => colorMap[label.toLowerCase()] || "rgba(128, 128, 128, 0.8)"
-    );
-
+    const defaultLabels = ["felicidade", "tristeza", "raiva", "estresse", "nojo", "surpresa", "neutro"];
+    
+    const values = defaultLabels.map(label => {
+      return emotionData[label] || 0;
+    });
+  
     const updatedData = {
-      labels: labels,
+      labels: defaultLabels,
       datasets: [
         {
           label: "Emoções Detectadas",
           data: values,
-          backgroundColor: colors,
+          backgroundColor: [
+            "rgba(0, 255, 0, 0.8)",
+            "rgba(255, 0, 0, 0.8)",
+            "rgba(0, 0, 255, 0.8)",
+            "rgba(255, 0, 255, 0.8)",
+            "rgba(0, 255, 255, 0.8)",
+            "rgba(255, 255, 0, 0.8)",
+            "rgba(200, 200, 200, 0.8)",
+          ],
         },
       ],
     };
-
+  
     setData(updatedData);
   };
 
@@ -274,6 +380,12 @@ export default function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('user');
+    setIsLogged(false);
+    setUsername("");
   };
 
   const options: ChartOptions<"bar"> = {
@@ -330,9 +442,9 @@ export default function Dashboard() {
         <header className={styles.header}>
           <div className={styles.headerContent}>
             <h1 className={styles.title}>
-            <li className={styles.navItem} title="Home">
-                  <Home size={20} />
-                </li>
+              <li className={styles.navItem} title="Home">
+                <Home size={20} />
+              </li>
               <BarChart className={styles.titleIcon} size={28} />
               Insights Faciais | Emocional em Foco
             </h1>
@@ -341,11 +453,10 @@ export default function Dashboard() {
                 {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
               </span>
               <ul className={styles.navLinks}>
-
                 {isLogged ? (
                   <>
-                  <li className={styles.navItem}>Sair</li>
-                  <li className={styles.navItem}>Bem-Vindo(a): "usuario"</li>
+                    <li className={styles.navItem} onClick={handleLogout}>Sair</li>
+                    <li className={styles.navItem}>Bem-Vindo(a): {username}</li>
                   </>
                 ) : (
                   <>
@@ -364,7 +475,6 @@ export default function Dashboard() {
 
         <div className={styles.container}>
           <div className={styles.gridLayout}>
-            {/* Coluna esquerda - Painel de Controle */}
             <div className={styles.controlPanel}>
               <div className={styles.card}>
                 <h2 className={styles.cardTitle}>Painel de Controle</h2>
@@ -464,7 +574,10 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className={styles.progressBar}>
-                      <div className={styles.progressValue}></div>
+                      <div 
+                        className={styles.progressValue} 
+                        style={{ width: `${Math.min(totalAnalyzed, 100)}%` }}
+                      ></div>
                     </div>
                   </div>
                 )}
@@ -478,9 +591,17 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+              
+              <video 
+                ref={videoRef}
+                style={{ display: 'none' }}
+                width="640"
+                height="480"
+                muted
+                playsInline
+              />
             </div>
 
-            {/* Coluna direita - Última Captura + Resultados */}
             <div className={styles.resultsColumn}>
               {lastImageUrl && (
                 <div className={styles.card}>

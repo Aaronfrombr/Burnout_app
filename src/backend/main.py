@@ -1,4 +1,3 @@
-# src/backend/main.py
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, validator
@@ -18,7 +17,7 @@ app = FastAPI()
 # Configura CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001"],  # Ajuste para o domínio do seu frontend
+    allow_origins=["http://localhost:3000"],  # Ajuste para o domínio do seu frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

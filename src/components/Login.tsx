@@ -3,15 +3,10 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { login } from "../models/api";
 import styles from '../styles/Login.module.css';
-import { Pacifico } from 'next/font/google';
 import Image from "next/image";
 import Head from 'next/head';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, AlertCircle, X } from "lucide-react";
 
-const pacifico = Pacifico({
-  weight: '400',
-  subsets: ['latin'],
-});
 
 const backgroundImages = [
   "/image/Janeiro-Branco-Bem-estar-Psicologico-e-Emocional.jpg",
@@ -185,7 +180,7 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <h1 className={`${styles.title} ${pacifico.className}`}>
+          <h1 className={`${styles.title}`}>
             {title}
             <span className={styles.cursor}>|</span>
           </h1>
