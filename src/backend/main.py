@@ -23,6 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
 # Modelo Pydantic para validação
 class UserCreate(BaseModel):
     name: str
@@ -63,10 +67,57 @@ def get_db_connection():
         print("Erro ao conectar ao banco de dados:", e)
         raise
 
+
 # Função para criar hash da senha
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
+@app.post("/login/")
+async def login_user(user: UserLogin):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Busca usuário pelo email
+        cur.execute("SELECT * FROM users WHERE email = %s", (user.email,))
+        db_user = cur.fetchone()
+        
+        if not db_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email não cadastrado"
+            )
+        
+        # Verifica a senha
+        hashed_password = hash_password(user.password)
+        if db_user['password_hash'] != hashed_password:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Senha incorreta"
+            )
+        
+        # Retorna os dados do usuário (sem a senha)
+        return {
+            "success": True,
+            "user": {
+                "id": db_user['id'],
+                "name": db_user['name'],
+                "email": db_user['email']
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Erro durante o login:", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ocorreu um erro durante o login"
+        )
+    finally:
+        if conn is not None:
+            conn.close()
 # Rota de registro
 @app.post("/register/", status_code=status.HTTP_201_CREATED)
 async def register_user(user: UserCreate):
