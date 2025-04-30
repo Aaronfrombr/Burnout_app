@@ -1,84 +1,60 @@
-import { useState, FormEvent, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  AlertCircle,
+  X,
+} from "lucide-react";
+import Head from "next/head";
 import { login } from "../models/api";
-import styles from '../styles/Login.module.css';
-import Image from "next/image";
-import Head from 'next/head';
-import { Eye, EyeOff, Mail, Lock, CheckCircle, AlertCircle, X } from "lucide-react";
+import { signIn } from "next-auth/react";
 
-const backgroundImages = [
-  "/image/Janeiro-Branco-Bem-estar-Psicologico-e-Emocional.jpg",
-  "/image/bem-estar.png",
-  "/image/bem-estar-psicologico.avif",
-];
-
-type ModalProps = {
-  type: 'success' | 'error' | null;
-  message: string;
-  onClose: () => void;
-};
-
-const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, []);
-
-  return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div 
-        className={`${styles.modalContainer} ${type === 'success' ? styles.successModal : styles.errorModal}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button className={styles.closeButton} onClick={onClose}>
-          <X size={20} />
-        </button>
-        <div className={styles.modalIcon}>
-          {type === 'success' ? <CheckCircle size={50} /> : <AlertCircle size={50} />}
-        </div>
-        <h3 className={styles.modalTitle}>
-          {type === 'success' ? 'Sucesso!' : 'Erro!'}
-        </h3>
-        <p className={styles.modalMessage}>{message}</p>
-        <button 
-          className={styles.modalButton}
-          onClick={onClose}
-        >
-          {type === 'success' ? 'Continuar' : 'Tentar novamente'}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default function Login() {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: ""
-  });
-  const [errors, setErrors] = useState({
-    email: "",
-    password: ""
-  });
+const LoginPage = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState("");
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [modal, setModal] = useState<{
-    type: 'success' | 'error' | null;
-    message: string;
-  }>({ type: null, message: '' });
-
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<"success" | "error">("success");
+  const [modalMessage, setModalMessage] = useState("");
   const router = useRouter();
 
+  // Background images para o carrossel
+  const backgroundColors = [
+    "from-purple-200 to-purple-500",
+    "from-blue-200 to-blue-500",
+    "from-pink-200 to-pink-500",
+  ];
+
   useEffect(() => {
-    const fullTitle = "WELL BEING";
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      router.push("/login");
+    }
+    const rememberedEmail = localStorage.getItem("rememberedEmail"); // Corrigido para usar a mesma chave
+    const shouldRemember =
+      localStorage.getItem("shouldRememberEmail") === "true";
+
+    if (rememberedEmail && shouldRemember) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
+  // Efeito de digitação do título
+  useEffect(() => {
+    const fullTitle = "EmotionTrack";
     let currentIndex = 0;
-    
+
     const typingInterval = setInterval(() => {
       if (currentIndex <= fullTitle.length) {
         setTitle(fullTitle.substring(0, currentIndex));
@@ -91,226 +67,490 @@ export default function Login() {
     return () => clearInterval(typingInterval);
   }, []);
 
+  // Efeito de carrossel das imagens de fundo
   useEffect(() => {
-    const slideInterval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => 
-        (prevIndex + 1) % backgroundImages.length
-      );
+    const interval = setInterval(() => {
+      setCurrentBgIndex((prev) => (prev + 1) % backgroundColors.length);
     }, 3000);
-    
-    return () => clearInterval(slideInterval);
+    return () => clearInterval(interval);
   }, []);
 
-  const validateForm = () => {
-    let valid = true;
-    const newErrors = {
-      email: "",
-      password: ""
-    };
+  // Simulação de login
+  const handleLogin = async () => {
+    // Validação básica (mantida igual)
+    let isValid = true;
 
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = "Email é obrigatório";
-      valid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Por favor, insira um email válido";
-      valid = false;
+    if (!email) {
+      setEmailError("Email é obrigatório");
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError("Por favor, insira um email válido");
+      isValid = false;
+    } else {
+      setEmailError("");
     }
 
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = "Senha é obrigatória";
-      valid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = "A senha deve ter pelo menos 6 caracteres";
-      valid = false;
+    if (!password) {
+      setPasswordError("Senha é obrigatória");
+      isValid = false;
+    } else {
+      setPasswordError("");
     }
 
-    setErrors(newErrors);
-    return valid;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error when user starts typing
-    if (errors[name as keyof typeof errors]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ""
-      }));
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!isValid) return;
 
     setIsLoading(true);
 
     try {
-      const response: any = await login(formData.email, formData.password);
-      
+      const response = await login(email, password);
+
       if (response.success) {
-        // Login bem-sucedido
-        const storage = rememberMe ? localStorage : sessionStorage;
-        storage.setItem('authToken', response.token);
-        storage.setItem('userData', JSON.stringify({
-          name: response.user.name,
-          email: response.user.email
-        }));
-        setModal({
-          type: 'success',
-          message: 'Login realizado com sucesso! Redirecionando...'
-        });
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", email);
+          localStorage.setItem("shouldRememberEmail", "true");
+        } else {
+          localStorage.removeItem("rememberedEmail");
+          localStorage.removeItem("shouldRememberEmail");
+        }
+        if (response.token) {
+          localStorage.setItem("authToken", response.token);
+        }
+        if (response.user) {
+          localStorage.setItem("userData", JSON.stringify(response.user));
+        }
+        setModalType("success");
+        setModalMessage("Login realizado com sucesso! Redirecionando...");
+        setShowModal(true);
+
+        // Redireciona após 2 segundos
         setTimeout(() => {
-          router.push('/dashboard')
-        }, 1500);
-        
-        // Armazena o token e redireciona
+          router.push("/");
+        }, 2000);
       } else {
-        setModal({
-          type: 'error',
-          message: response.message || 'Credenciais inválidas'
-        });
+        setModalType("error");
+        setModalMessage(response.message || "Credenciais inválidas");
+        setShowModal(true);
       }
-    } catch (err) {
-      console.error("Login error:", err);
-      setModal({
-        type: 'error',
-        message: 'Erro ao conectar com o servidor. Tente novamente mais tarde.'
-      });
+    } catch (error) {
+      console.error("Login error:", error);
+      setModalType("error");
+      setModalMessage("Erro ao conectar com o servidor");
+      setShowModal(true);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const closeModal = () => {
+    setShowModal(false);
+  };
+
   return (
     <>
       <Head>
-        <title>WellBeing | Login</title>
+        <title>EmotionTrack | Login </title>
         <link rel="icon" href="/image/logo.png" />
       </Head>
-      
-      <div className={styles.animatedContainer}>
-        <div className={styles.backgroundContainer}>
-          {backgroundImages.map((src, index) => (
-            <Image
-              key={src}
-              src={src}
-              alt={`Background ${index + 1}`}
-              fill
-              quality={100}
-              priority={index === 0}
-              className={`${styles.backgroundImage} ${index === currentImageIndex ? styles.active : ''}`}
-            />
+      <div className="flex min-h-screen w-full overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+        <link
+          href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+          rel="stylesheet"
+        ></link>
+        {/* Background image carousel - lado esquerdo */}
+        <div
+          className={`relative hidden md:flex md:w-1/2 lg:w-3/5 h-screen bg-gradient-to-br transition-all duration-1000 ${backgroundColors[currentBgIndex]}`}
+          style={{ backgroundColor: backgroundColors[currentBgIndex] }}
+        >
+          {backgroundColors.map((img, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ${
+                index === currentBgIndex ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <div
+                className="absolute top-0 left-0 right-0 bottom-0 bg-cover bg-center h-full w-full"
+                style={{
+                  backgroundImage: `url(${img})`,
+                }}
+              ></div>
+
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-900/70 to-indigo-700/50" />
+            </div>
           ))}
-          <div className={styles.backgroundOverlay}></div>
-          <div className={styles.topGradient}></div>
-          <div className={styles.bottomGradient}></div>
-          <div className={styles.leftGradient}></div>
-          <div className={styles.rightGradient}></div>
+
+          {/* Branding overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-white">
+            <div className="max-w-lg text-center">
+              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600" />
+              </div>
+
+              <h1 className="mb-4 text-5xl font-bold tracking-tight">
+                EmotionTrack
+              </h1>
+              <p className="mb-8 text-xl font-light leading-relaxed">
+                Monitore e compreenda suas emoções para uma vida mais
+                equilibrada e consciente
+              </p>
+
+              <div className="mt-16 flex justify-center space-x-3">
+                {backgroundColors.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentBgIndex(idx)}
+                    className={`h-2 w-12 rounded-full transition-all ${
+                      idx === currentBgIndex
+                        ? "bg-white"
+                        : "bg-white/30 hover:bg-white/50"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-12 grid grid-cols-3 gap-4">
+                <div className="rounded-lg bg-white/10 backdrop-blur-sm p-4 text-center">
+                  <h3 className="font-semibold">Acompanhamento</h3>
+                  <p className="text-sm opacity-80">
+                    Rastreie seu humor diariamente
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white/10 backdrop-blur-sm p-4 text-center">
+                  <h3 className="font-semibold">Visualização</h3>
+                  <p className="text-sm opacity-80">
+                    Gráficos e padrões emocionais
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white/10 backdrop-blur-sm p-4 text-center">
+                  <h3 className="font-semibold">Bem-estar</h3>
+                  <p className="text-sm opacity-80">Insights para equilíbrio</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className={styles.form} noValidate>
-          <h1 className={`${styles.title}`}>
-            {title}
-            <span className={styles.cursor}>|</span>
-          </h1>
+        {/* Login form - lado direito */}
+        <div className="flex w-full items-center justify-center px-4 md:w-1/2 lg:w-2/5">
+          <div className="w-full max-w-md">
+            <div className="rounded-2xl bg-white p-8 shadow-xl">
+              <div className="text-center">
+                <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+                  {title}
+                  <span className="ml-1 inline-block animate-pulse text-indigo-600">
+                    |
+                  </span>
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  Faça login para continuar sua jornada emocional
+                </p>
+              </div>
 
-          <div className={styles.inputGroup}>
-            <label htmlFor="email" className={styles.label}>Email</label>
-            <Mail size={18} className={styles.inputIcon} />
-            <div className={styles.inputWrapper}>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Digite seu email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`${styles.input} ${errors.email ? styles.inputError : ''}`}
-              />
+              <div className="mt-8 space-y-6">
+                <div className="space-y-5">
+                  {/* Campo de Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <Mail size={16} className="text-gray-400" />
+                      </div>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setEmail(value);
+
+                          // Validação em tempo real (opcional)
+                          if (
+                            value &&
+                            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+                          ) {
+                            setEmailError("Por favor, insira um email válido");
+                          } else {
+                            setEmailError("");
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // Validação quando o campo perde o foco
+                          if (!e.target.value) {
+                            setEmailError("Email é obrigatório");
+                          } else if (
+                            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)
+                          ) {
+                            setEmailError("Por favor, insira um email válido");
+                          } else {
+                            setEmailError("");
+                          }
+                        }}
+                        className={`block w-full rounded-lg border px-10 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-30 ${
+                          emailError
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-500 focus:ring-opacity-30"
+                            : "border-gray-300"
+                        }`}
+                        placeholder="seu-email@exemplo.com"
+                      />
+                    </div>
+                    {emailError && (
+                      <p className="mt-1.5 text-sm text-red-600 flex items-center">
+                        <AlertCircle size={14} className="mr-1" />
+                        {emailError}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Campo de Senha */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Senha
+                    </label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <Lock size={16} className="text-gray-400" />
+                      </div>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`block w-full rounded-lg border px-10 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-30 ${
+                          passwordError
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-500 focus:ring-opacity-30"
+                            : "border-gray-300"
+                        }`}
+                        placeholder="Digite sua senha"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        {showPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <p className="mt-1.5 text-sm text-red-600 flex items-center">
+                        <AlertCircle size={14} className="mr-1" />
+                        {passwordError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Opções adicionais */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Lembrar de mim
+                    </label>
+                  </div>
+
+                  <div>
+                    <a href="/forgotpassword">
+                      <button className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+                        Esqueceu sua senha?
+                      </button>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Botão de Login */}
+                <div>
+                  <button
+                    onClick={handleLogin}
+                    disabled={isLoading}
+                    className="group relative flex w-full justify-center rounded-lg py-3 px-4 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 transition-all bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-70"
+                  >
+                    {isLoading ? (
+                      <svg
+                        className="h-5 w-5 animate-spin text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                    ) : (
+                      "Entrar"
+                    )}
+                  </button>
+                </div>
+
+                {/* Link para registro */}
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">
+                    Não tem uma conta?{" "}
+                    <a href="/register">
+                      <button className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+                        Criar uma conta
+                      </button>
+                    </a>
+                  </p>
+                </div>
+
+                {/* Separador */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="bg-white px-2 text-gray-500">
+                      ou continue com
+                    </span>
+                  </div>
+                </div>
+
+                {/* Botões de login social */}
+                {/* Botões de login social - ATUALIZADO */}
+                <div className="mt-6 grid grid-cols-3 gap-3">
+                  {/* Google */}
+                  <button
+                    className="flex items-center justify-center rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24">
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        fill="#EA4335"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Facebook */}
+                  <button
+                    className="flex items-center justify-center rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      /* implementar login com Facebook */
+                    }}
+                  >
+                    <svg className="h-5 w-5" fill="#1877F2" viewBox="0 0 24 24">
+                      <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+                    </svg>
+                  </button>
+
+                  {/* LinkedIn */}
+                  <button
+                    className="flex items-center justify-center rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      /* implementar login com LinkedIn */
+                    }}
+                  >
+                    <svg className="h-5 w-5" fill="#0A66C2" viewBox="0 0 24 24">
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
-            {errors.email && <span className={styles.errorMessage}>{errors.email}</span>}
-          </div>
 
-          <div className={styles.inputGroup}>
-            <label htmlFor="password" className={styles.label}>Senha</label>
-            <Lock size={18} className={styles.inputIcon} />
-            <div className={styles.inputWrapper}>
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Digite sua senha"
-                value={formData.password}
-                onChange={handleChange}
-                className={`${styles.input} ${errors.password ? styles.inputError : ''}`}
-              />
+            {/* Footer com informações adicionais */}
+            <div className="mt-8 text-center text-xs text-gray-500">
+              <p>© 2025 EmotionTrack. Todos os direitos reservados.</p>
+              <div className="mt-2 flex justify-center space-x-4">
+                <button className="hover:text-gray-700 transition-colors">
+                  Termos
+                </button>
+                <button className="hover:text-gray-700 transition-colors">
+                  Privacidade
+                </button>
+                <button className="hover:text-gray-700 transition-colors">
+                  Suporte
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal de feedback */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div
+              className={`bg-white rounded-2xl shadow-xl max-w-md w-full p-6 transform transition-all scale-100 relative ${
+                modalType === "success"
+                  ? "border-l-8 border-green-500"
+                  : "border-l-8 border-red-500"
+              }`}
+            >
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className={styles.toggleButton}
-                aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors"
+                onClick={closeModal}
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                <X size={20} />
               </button>
+
+              <div className="flex flex-col items-center text-center">
+                <div
+                  className={`rounded-full p-3 mb-4 ${
+                    modalType === "success"
+                      ? "text-green-500 bg-green-100"
+                      : "text-red-500 bg-red-100"
+                  }`}
+                >
+                  {modalType === "success" ? (
+                    <CheckCircle size={40} />
+                  ) : (
+                    <AlertCircle size={40} />
+                  )}
+                </div>
+
+                <h3 className="text-xl font-bold mb-2">
+                  {modalType === "success" ? "Sucesso!" : "Erro!"}
+                </h3>
+
+                <p className="text-gray-600 mb-6">{modalMessage}</p>
+
+                <button
+                  className={`w-full py-3 rounded-lg font-medium text-white transition-all ${
+                    modalType === "success"
+                      ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                      : "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700"
+                  }`}
+                  onClick={closeModal}
+                >
+                  {modalType === "success" ? "Continuar" : "Tentar novamente"}
+                </button>
+              </div>
             </div>
-            {errors.password && <span className={styles.errorMessage}>{errors.password}</span>}
           </div>
-
-          <div className={styles.rememberMe}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className={styles.checkboxInput}
-              />
-              <span className={styles.checkmark}></span>
-              Lembrar de mim
-            </label>
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={isLoading} 
-            className={styles.submitButton}
-            aria-busy={isLoading}
-          >
-            {isLoading ? (
-              <span className={styles.loading}></span>
-            ) : (
-              'Entrar'
-            )}
-          </button>
-
-          <div className={styles.links}>
-            <Link href="/forgotpassword" className={styles.link}>
-              Esqueceu sua senha?
-            </Link>
-            <Link href="/register" className={styles.link}>
-              Criar uma conta
-            </Link>
-          </div>
-        </form>
+        )}
       </div>
-
-      {modal.type && (
-        <FeedbackModal
-          type={modal.type}
-          message={modal.message}
-          onClose={() => setModal({ type: null, message: '' })}
-        />
-      )}
     </>
   );
-}
+};
+
+export default LoginPage;

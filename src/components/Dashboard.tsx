@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "./useAuth";
 import { useRouter } from "next/navigation";
-import { Home } from "lucide-react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -15,8 +14,20 @@ import {
   ChartData,
   ChartOptions,
 } from "chart.js";
-import { Camera, Upload, Play, Square, Download, BarChart } from "lucide-react";
-import styles from '../styles/Dashboard.module.css';
+import {
+  Camera,
+  Upload,
+  Play,
+  Square,
+  Download,
+  BarChart,
+  Home,
+  ChevronRight,
+  AlertCircle,
+  Brain,
+  Timer,
+  NotepadText,
+} from "lucide-react";
 import Head from "next/head";
 
 ChartJS.register(
@@ -29,6 +40,9 @@ ChartJS.register(
 );
 
 export default function Dashboard() {
+  const router = useRouter();
+  const { isLogged, userName } = useAuth();
+
   // Estados da análise
   const [data, setData] = useState<ChartData<"bar">>({
     labels: [
@@ -45,13 +59,13 @@ export default function Dashboard() {
         label: "Emoções Detectadas",
         data: [0, 0, 0, 0, 0, 0, 0],
         backgroundColor: [
-          "rgba(0, 255, 0, 0.8)",
-          "rgba(255, 0, 0, 0.8)",
-          "rgba(0, 0, 255, 0.8)",
-          "rgba(255, 0, 255, 0.8)",
-          "rgba(0, 255, 255, 0.8)",
-          "rgba(255, 255, 0, 0.8)",
-          "rgba(200, 200, 200, 0.8)",
+          "rgba(34, 197, 94, 0.85)", // verde mais moderno
+          "rgba(239, 68, 68, 0.85)", // vermelho mais moderno
+          "rgba(59, 130, 246, 0.85)", // azul mais moderno
+          "rgba(168, 85, 247, 0.85)", // roxo mais moderno
+          "rgba(14, 165, 233, 0.85)", // ciano mais moderno
+          "rgba(234, 179, 8, 0.85)", // amarelo mais moderno
+          "rgba(107, 114, 128, 0.85)", // cinza mais moderno
         ],
       },
     ],
@@ -63,15 +77,13 @@ export default function Dashboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [mode, setMode] = useState<"singleImage" | "continuous">("singleImage");
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
-  
+
   // Refs
   const dataPollingInterval = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Autenticação
-  const router = useRouter();
-  const { isLogged, userName } = useAuth();
 
   useEffect(() => {
     const checkServerStatus = async () => {
@@ -345,13 +357,13 @@ export default function Dashboard() {
 
   const updateChartData = (emotionData: Record<string, number>) => {
     const defaultLabels = [
-      "felicidade",
-      "tristeza",
-      "raiva",
-      "estresse",
-      "nojo",
-      "surpresa",
-      "neutro",
+      "Felicidade",
+      "Tristeza",
+      "Raiva",
+      "Estresse",
+      "Nojo",
+      "Surpresa",
+      "Neutro",
     ];
 
     const values = defaultLabels.map((label) => {
@@ -365,13 +377,13 @@ export default function Dashboard() {
           label: "Emoções Detectadas",
           data: values,
           backgroundColor: [
-            "rgba(0, 255, 0, 0.8)",
-            "rgba(255, 0, 0, 0.8)",
-            "rgba(0, 0, 255, 0.8)",
-            "rgba(255, 0, 255, 0.8)",
-            "rgba(0, 255, 255, 0.8)",
-            "rgba(255, 255, 0, 0.8)",
-            "rgba(200, 200, 200, 0.8)",
+            "rgba(34, 197, 94, 0.85)", // verde mais moderno
+            "rgba(239, 68, 68, 0.85)", // vermelho mais moderno
+            "rgba(59, 130, 246, 0.85)", // azul mais moderno
+            "rgba(168, 85, 247, 0.85)", // roxo mais moderno
+            "rgba(14, 165, 233, 0.85)", // ciano mais moderno
+            "rgba(234, 179, 8, 0.85)", // amarelo mais moderno
+            "rgba(107, 114, 128, 0.85)", // cinza mais moderno
           ],
         },
       ],
@@ -403,14 +415,11 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => {
-    // Limpar todos os dados de autenticação
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userData');
-    sessionStorage.removeItem('authToken');
-    sessionStorage.removeItem('userData');
-    
-    // Forçar recarregamento para limpar qualquer estado residual
-    window.location.href = '/';
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    sessionStorage.removeItem("authToken");
+    sessionStorage.removeItem("userData");
+    window.location.href = "/";
   };
 
   const options: ChartOptions<"bar"> = {
@@ -457,221 +466,597 @@ export default function Dashboard() {
     return `Emoção predominante: ${data.labels[highestIndex]}`;
   };
 
+  const getEmotionColor = () => {
+    if (!data.labels || data.labels.length === 0) return "bg-gray-500";
+
+    let highestIndex = 0;
+    let highestValue = 0;
+
+    data.datasets[0].data.forEach((value: any, index) => {
+      if (value > highestValue) {
+        highestValue = value as number;
+        highestIndex = index;
+      }
+    });
+
+    if (highestValue === 0) return "bg-gray-500";
+
+    const colors = [
+      "bg-green-500", // felicidade
+      "bg-red-500", // tristeza
+      "bg-blue-500", // raiva
+      "bg-purple-500", // estresse
+      "bg-sky-500", // nojo
+      "bg-yellow-500", // surpresa
+      "bg-gray-500", // neutro
+    ];
+
+    return colors[highestIndex];
+  };
+
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-blue-900 text-white">
       <Head>
-        <title>WellBeing | Análise Facial em Tempo Real</title>
+        <title>EmotionTrack | Análise Facial em Tempo Real</title>
         <link rel="icon" href="/image/logo.png" />
       </Head>
-      <div className={styles.dashboardContainer}>
-        <header className={styles.header}>
-          <div className={styles.headerContent}>
-            <h1 className={styles.title}>
-              <li className={styles.navItem} title="Home">
-                <Home size={20} />
-              </li>
-              <BarChart className={styles.titleIcon} size={28} />
-              Insights Faciais | Emocional em Foco
-            </h1>
-            <nav className={styles.navBar}>
-              <span className={styles.statusBadge}>
-                {isAnalyzing ? "Análise em tempo real" : "Pronto para análise"}
-              </span>
-              <ul className={styles.navLinks}>
+      <link
+        href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+        rel="stylesheet"
+      ></link>
+      {/* Header */}
+      <header className="bg-gradient-to-r from-indigo-600 to-blue-600 shadow-xl relative z-10 transition-all duration-300 hover:brightness-105">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo e título */}
+            <div className="flex items-center space-x-3 group cursor-pointer">
+              <h1 className="flex items-center text-2xl font-bold text-white transition-all duration-300 group-hover:tracking-wider">
+                <Brain className="text-white h-8 w-8 mr-2 animate-pulse group-hover:scale-110 transition-transform duration-300" />
+                <span>EmotionTrack</span>
+              </h1>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <a
+                href="/"
+                className="p-2 rounded-full hover:bg-black transition duration-200"
+              >
+                <Home size={20} className="text-white" />
+              </a>
+              <div
+                className={`px-3 py-1 rounded-full text-sm shadow-inner backdrop-blur-sm ${
+                  isAnalyzing
+                    ? "bg-green-100 text-green-800"
+                    : "bg-white/20 text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <span
+                    className={`w-2 h-2 rounded-full mr-2 ${
+                      isAnalyzing ? "bg-green-500 animate-ping" : "bg-white"
+                    }`}
+                  ></span>
+                  {isAnalyzing ? "ANÁLISE ATIVA" : "PRONTO"}
+                </span>
+              </div>
+
+              {isLogged ? (
+                <div className="flex items-center space-x-3">
+                  <div className="text-white/90 text-sm font-medium leading-tight">
+                    <p className="text-xs text-white/70">Logado como:</p>
+                    <p className="font-semibold">{userName || "Usuário"}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-black transition-all duration-200 backdrop-blur-md shadow-sm"
+                  >
+                    Sair
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <a
+                    href="/"
+                    className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-white/30 transition duration-200 backdrop-blur-md shadow-sm"
+                  >
+                    Entrar
+                  </a>
+                  <a
+                    href="/register"
+                    className="px-4 py-2 rounded-md bg-white text-indigo-600 hover:bg-gray-100 transition duration-200 shadow-sm"
+                  >
+                    Cadastrar
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          {/* Left Panel - Controls */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-indigo-600 to-blue-500 py-4 px-6">
+                <h2 className="text-white text-xl font-bold flex items-center">
+                  <span className="mr-2">Painel de Controle</span>
+                </h2>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Mode Selection */}
                 {isLogged ? (
                   <>
-                    <li className={styles.navItem} onClick={handleLogout}>
-                      Sair
-                    </li>
-                    <li className={styles.navItem}>
-                      Bem-Vindo(a): {userName || "Usuário"}
-                    </li>
+                    <>
+                      <div>
+                        <h3 className="text-gray-700 font-medium mb-3">
+                          Modo de Análise
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => setMode("singleImage")}
+                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              mode === "singleImage"
+                                ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
+                                : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
+                            }`}
+                          >
+                            <Camera className="mr-2" size={18} />
+                            <span>Imagem Única</span>
+                          </button>
+                          <button
+                            onClick={() => setMode("continuous")}
+                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              mode === "continuous"
+                                ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
+                                : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
+                            }`}
+                          >
+                            <Timer className="mr-2" size={18} />
+                            <span>Análise Contínua</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-gray-700 font-medium mb-3">
+                          Controles
+                        </h3>
+                        {mode === "singleImage" ? (
+                          <button
+                            onClick={analyzeSingleImage}
+                            disabled={isLoading}
+                            className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              isLoading
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            }`}
+                          >
+                            <Camera className="mr-2" size={18} />
+                            {isLoading ? (
+                              <span className="flex items-center">
+                                <svg
+                                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                  ></circle>
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  ></path>
+                                </svg>
+                                Analisando...
+                              </span>
+                            ) : (
+                              "Capturar e Analisar"
+                            )}
+                          </button>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              onClick={startContinuousAnalysis}
+                              disabled={isLoading || isAnalyzing}
+                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                                isLoading || isAnalyzing
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-green-600 hover:bg-green-700 text-white"
+                              }`}
+                            >
+                              <Play className="mr-2" size={18} />
+                              {isLoading ? (
+                                <span className="flex items-center">
+                                  <svg
+                                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                  </svg>
+                                  Iniciando...
+                                </span>
+                              ) : (
+                                "Iniciar"
+                              )}
+                            </button>
+                            <button
+                              onClick={stopContinuousAnalysis}
+                              disabled={!isAnalyzing || isLoading}
+                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                                !isAnalyzing || isLoading
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-red-600 hover:bg-red-700 text-white"
+                              }`}
+                            >
+                              <Square className="mr-2" size={18} />
+                              Parar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Exportação
+                      </h3>
+                      <button
+                        onClick={exportData}
+                        disabled={!data.labels || data.labels.length === 0}
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          !data.labels || data.labels.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-700 text-white"
+                        }`}
+                      >
+                        <Download className="mr-2" size={18} />
+                        Exportar CSV
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Reportar
+                      </h3>
+                      <span className="text-black">
+                        Nesta seção, será necessário que a partir de um certo
+                        nível/porcentagem de estresse a IA automaticamente gere
+                        um diagnóstico e um alerta, juntamente com o envio para
+                        uma autoridade. Porém, o usuário pode gerar este
+                        relatório por escrito que a IA gera a partir da análise
+                        efetuada.
+                      </span>
+                      <button
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          !data.labels || data.labels.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-700 text-white"
+                        }`}
+                      >
+                        <NotepadText className="mr-2" size={18} />
+                        Gerar Relatório
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
-                    <li className={styles.navItem}>
-                      <a href="/">Entrar</a>
-                    </li>
-                    <li className={styles.navItem}>
-                      <a href="/register">Cadastrar</a>
-                    </li>
-                  </>
-                )}
-              </ul>
-            </nav>
-          </div>
-        </header>
-
-        <div className={styles.container}>
-          <div className={styles.gridLayout}>
-            <div className={styles.controlPanel}>
-              <div className={styles.card}>
-                <h2 className={styles.cardTitle}>Painel de Controle</h2>
-
-                <div className={styles.controlSection}>
-                  <h3 className={styles.sectionTitle}>Modo de Análise</h3>
-                  <div className={styles.buttonGrid}>
-                    <button
-                      onClick={() => setMode("singleImage")}
-                      className={`${styles.modeButton} ${
-                        mode === "singleImage" ? styles.activeButton : ""
-                      }`}
-                    >
-                      <Camera className={styles.buttonIcon} size={18} />
-                      <span>Imagem Única</span>
-                    </button>
-                    <button
-                      onClick={() => setMode("continuous")}
-                      className={`${styles.modeButton} ${
-                        mode === "continuous" ? styles.activeButton : ""
-                      }`}
-                    >
-                      <Upload className={styles.buttonIcon} size={18} />
-                      <span>Análise Contínua</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.controlSection}>
-                  <h3 className={styles.sectionTitle}>Controles</h3>
-                  {mode === "singleImage" ? (
-                    <button
-                      onClick={analyzeSingleImage}
-                      disabled={isLoading}
-                      className={`${styles.actionButton} ${
-                        styles.primaryButton
-                      } ${isLoading ? styles.disabledButton : ""}`}
-                    >
-                      <Camera className={styles.buttonIcon} size={18} />
-                      {isLoading ? "Analisando..." : "Capturar e Analisar"}
-                    </button>
-                  ) : (
-                    <div className={styles.buttonGrid}>
+                    <>
+                      <div>
+                        <div className="flex items-center space-x-3 group cursor-pointer">
+                          <h1 className="flex items-center text-3xl font-bold text-black transition-all duration-300 group-hover:tracking-wider mb-6">
+                            <span>
+                              Você precisa entrar para acessar este recurso.
+                            </span>
+                          </h1>
+                        </div>
+                        <h3 className="text-gray-700 font-medium mb-3">
+                          Modo de Análise
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            disabled
+                            onClick={() => setMode("singleImage")}
+                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              mode === "singleImage"
+                                ? "text-indigo-700 border-2"
+                                : "bg-gray-300 text-black"
+                            }`}
+                          >
+                            <Camera className="mr-2" size={18} />
+                            <span>Imagem Única</span>
+                          </button>
+                          <button
+                            disabled
+                            onClick={() => setMode("continuous")}
+                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              mode === "continuous"
+                                ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
+                                : "text-gray-700 border border-gray-200"
+                            }`}
+                          >
+                            <Timer className="mr-2" size={18} />
+                            <span>Análise Contínua</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-gray-700 font-medium mb-3">
+                          Controles
+                        </h3>
+                        {mode === "singleImage" ? (
+                          <button
+                            onClick={analyzeSingleImage}
+                            disabled
+                            className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              isLoading
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : "bg-gray-300 text-black"
+                            }`}
+                          >
+                            <Camera className="mr-2" size={18} />
+                            {isLoading ? (
+                              <span className="flex items-center">
+                                <svg
+                                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                  ></circle>
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  ></path>
+                                </svg>
+                                Analisando...
+                              </span>
+                            ) : (
+                              "Capturar e Analisar"
+                            )}
+                          </button>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              onClick={startContinuousAnalysis}
+                              disabled
+                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                                isLoading || isAnalyzing
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-gray-300 text-black"
+                              }`}
+                            >
+                              <Play className="mr-2" size={18} />
+                              {isLoading ? (
+                                <span className="flex items-center">
+                                  <svg
+                                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                  </svg>
+                                  Iniciando...
+                                </span>
+                              ) : (
+                                "Iniciar"
+                              )}
+                            </button>
+                            <button
+                              onClick={stopContinuousAnalysis}
+                              disabled
+                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                                !isAnalyzing || isLoading
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-gray-300 text-black"
+                              }`}
+                            >
+                              <Square className="mr-2" size={18} />
+                              Parar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Exportação
+                      </h3>
                       <button
-                        onClick={startContinuousAnalysis}
-                        disabled={isLoading || isAnalyzing}
-                        className={`${styles.actionButton} ${
-                          styles.successButton
-                        } ${
-                          isLoading || isAnalyzing ? styles.disabledButton : ""
+                        onClick={exportData}
+                        disabled
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          !data.labels || data.labels.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-gray-300 text-black"
                         }`}
                       >
-                        <Play className={styles.buttonIcon} size={18} />
-                        {isLoading ? "Iniciando..." : "Iniciar"}
-                      </button>
-                      <button
-                        onClick={stopContinuousAnalysis}
-                        disabled={!isAnalyzing || isLoading}
-                        className={`${styles.actionButton} ${
-                          styles.dangerButton
-                        } ${
-                          !isAnalyzing || isLoading ? styles.disabledButton : ""
-                        }`}
-                      >
-                        <Square className={styles.buttonIcon} size={18} />
-                        Parar
+                        <Download className="mr-2" size={18} />
+                        Exportar CSV
                       </button>
                     </div>
-                  )}
-                </div>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Reportar
+                      </h3>
+                      <button
+                        disabled
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          !data.labels || data.labels.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-gray-300 text-black"
+                        }`}
+                      >
+                        <NotepadText className="mr-2" size={18} />
+                        Gerar Relatório
+                      </button>
+                    </div>
+                  </>
+                )}
 
-                <div className={styles.controlSection}>
-                  <h3 className={styles.sectionTitle}>Exportação</h3>
-                  <button
-                    onClick={exportData}
-                    disabled={!data.labels || data.labels.length === 0}
-                    className={`${styles.actionButton} ${
-                      styles.secondaryButton
-                    } ${
-                      !data.labels || data.labels.length === 0
-                        ? styles.disabledButton
-                        : ""
-                    }`}
-                  >
-                    <Download className={styles.buttonIcon} size={18} />
-                    Exportar CSV
-                  </button>
-                </div>
-
+                {/* Analysis Status */}
                 {isAnalyzing && (
-                  <div className={styles.statusPanel}>
-                    <h3 className={styles.statusTitle}>Status da Análise</h3>
-                    <div className={styles.statusInfo}>
-                      <span>Frames analisados:</span>
-                      <span className={styles.statusValue}>
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h3 className="text-blue-800 font-medium mb-2">
+                      Status da Análise
+                    </h3>
+
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-blue-700">Frames analisados:</span>
+                      <span className="font-medium text-blue-900">
                         {totalAnalyzed}
                       </span>
                     </div>
-                    <div className={styles.progressBar}>
+
+                    <div className="w-full bg-blue-200 rounded-full h-2.5">
                       <div
-                        className={styles.progressValue}
+                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(totalAnalyzed, 100)}%` }}
                       ></div>
                     </div>
                   </div>
                 )}
 
+                {/* Error Message */}
                 {errorMessage && (
-                  <div className={styles.errorMessage}>
-                    <p className={styles.errorText}>
-                      <span className={styles.errorIcon}>⚠️</span>
-                      {errorMessage}
-                    </p>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+                      <p className="text-red-700 text-sm">{errorMessage}</p>
+                    </div>
                   </div>
                 )}
               </div>
-
-              <video
-                ref={videoRef}
-                style={{ display: "none" }}
-                width="640"
-                height="480"
-                muted
-                playsInline
-              />
             </div>
+          </div>
 
-            <div className={styles.resultsColumn}>
-              {lastImageUrl && (
-                <div className={styles.card}>
-                  <h2 className={styles.cardTitle}>Última Captura</h2>
-                  <div className={styles.imagePreview}>
+          {/* Right Panel - Results */}
+          <div className="lg:col-span-3">
+            {/* Image Preview */}
+            {lastImageUrl && (
+              <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200 mb-8">
+                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6">
+                  <h2 className="text-white text-xl font-bold">
+                    Última Captura
+                  </h2>
+                </div>
+
+                <div className="p-6">
+                  <div className="relative rounded-xl overflow-hidden shadow-inner border border-gray-200">
                     <img
                       src={lastImageUrl}
                       alt="Preview"
-                      className={styles.previewImage}
+                      className="w-full h-auto object-contain"
                     />
-                    <div className={styles.imageOverlay}>
-                      {getEmotionText()}
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 ${getEmotionColor()} text-white py-3 px-4 font-medium text-center backdrop-blur-sm bg-opacity-90`}
+                    >
+                      <div className="flex items-center justify-center">
+                        <span className="mr-2">🎯</span>
+                        {getEmotionText()}
+                      </div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              <div className={styles.card}>
-                <h2 className={styles.cardTitle}>Resultados da Análise</h2>
-                <div className={styles.chartContainer}>
-                  <Bar data={data} options={options} />
+            {/* Chart Results */}
+            <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200">
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6">
+                <h2 className="text-white text-xl font-bold">
+                  Resultados da Análise
+                </h2>
+              </div>
+
+              <div className="p-6">
+                <div className="h-72 mb-6">
+                  <Bar
+                    data={data}
+                    options={{
+                      ...options,
+                      plugins: {
+                        ...options.plugins,
+                        tooltip: {
+                          callbacks: {
+                            label: (context) =>
+                              `${context.label}: ${context.raw}%`,
+                          },
+                        },
+                      },
+                    }}
+                  />
                 </div>
-                <div className={styles.legendGrid}>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
                   {data.labels &&
                     data.labels.map((label: any, index: any) => (
-                      <div key={index} className={styles.legendItem}>
+                      <div
+                        key={index}
+                        className="flex items-center bg-gray-50 px-3 py-2 rounded-md"
+                      >
                         <div
-                          className={styles.colorIndicator}
+                          className="w-3 h-3 rounded-full mr-2"
                           style={{
                             backgroundColor: (
                               data.datasets[0].backgroundColor as string[]
                             )[index],
                           }}
                         ></div>
-                        <span className={styles.legendLabel}>{label}</span>
+                        <span className="text-sm text-gray-700">{label}</span>
                       </div>
                     ))}
                 </div>
-                <div className={styles.infoPanel}>
-                  <h3 className={styles.infoTitle}>Sobre a Análise</h3>
-                  <p className={styles.infoText}>
+
+                {/* Info Panel */}
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                  <h3 className="text-blue-800 font-medium mb-2 flex items-center">
+                    <ChevronRight size={18} className="mr-1" />
+                    Sobre a Análise
+                  </h3>
+                  <p className="text-blue-700 text-sm">
                     Este sistema detecta expressões faciais em tempo real usando
                     visão computacional. As emoções são classificadas com base
                     nos padrões faciais detectados.
@@ -681,7 +1066,17 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
-    </>
+      </main>
+
+      {/* Hidden video element */}
+      <video
+        ref={videoRef}
+        style={{ display: "none" }}
+        width="640"
+        height="480"
+        muted
+        playsInline
+      />
+    </div>
   );
 }

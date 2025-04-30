@@ -94,7 +94,7 @@ async def login_user(user: UserLogin):
         if db_user['password_hash'] != hashed_password:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Senha incorreta"
+                detail="Credenciais Inválidas"
             )
         
         # Retorna os dados do usuário (sem a senha)

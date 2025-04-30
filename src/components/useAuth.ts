@@ -10,11 +10,8 @@ export const useAuth = () => {
 
   useEffect(() => {
     const checkAuth = () => {
-      // Obter dados do localStorage ou sessionStorage
       const localStorageData = localStorage.getItem('userData');
       const sessionStorageData = sessionStorage.getItem('userData');
-      
-      // Verificar qual storage tem dados
       const storageData = localStorageData || sessionStorageData;
       
       if (storageData) {
@@ -30,9 +27,9 @@ export const useAuth = () => {
         }
       }
       
-      // Se não encontrou dados válidos
+      // Apenas atualiza o estado, sem redirecionar
       setIsLogged(false);
-      router.push('/');
+      setUserName('');
     };
 
     checkAuth();
