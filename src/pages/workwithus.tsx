@@ -1,4 +1,4 @@
-import WorkWithUs from "../components/NewPassword";
+import WorkWithUs from "../components/WorkWithUs";
 
 export default function WorkWithUsPage() {
   return <WorkWithUs />;
