@@ -108,7 +108,6 @@ export const submitReport = async (report: string, token: string): Promise<Repor
   }
 };
 
-// Função para verificar token (opcional)
 export const verifyToken = async (token: string): Promise<boolean> => {
   try {
     const response = await fetch(`${API_URL}/verify-token/`, {

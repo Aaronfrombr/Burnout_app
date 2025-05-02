@@ -27,7 +27,6 @@ export const useAuth = () => {
         }
       }
       
-      // Apenas atualiza o estado, sem redirecionar
       setIsLogged(false);
       setUserName('');
     };

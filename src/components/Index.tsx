@@ -58,9 +58,10 @@ export default function HomePage() {
     localStorage.removeItem("userData");
     sessionStorage.removeItem("authToken");
     sessionStorage.removeItem("userData");
-    const shouldRemember = localStorage.getItem('shouldRememberEmail') === 'true';
+    const shouldRemember =
+      localStorage.getItem("shouldRememberEmail") === "true";
     if (!shouldRemember) {
-      localStorage.removeItem('rememberedEmail');
+      localStorage.removeItem("rememberedEmail");
     }
 
     window.location.href = "/";
@@ -72,7 +73,7 @@ export default function HomePage() {
         <title>EmotionTrack | Home</title>
         <link rel="icon" href="/image/logo.png" />
       </Head>
-      
+
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50">
         <link
           href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
@@ -109,6 +110,12 @@ export default function HomePage() {
                 className="text-gray-700 hover:text-indigo-600 font-medium"
               >
                 Contato
+              </a>
+              <a
+                href="/workwithus"
+                className="text-gray-700 hover:text-indigo-600 font-medium"
+              >
+                Trabalhe Conosco
               </a>
             </div>
 
@@ -427,6 +434,11 @@ export default function HomePage() {
                         Contato
                       </a>
                     </li>
+                    <li>
+                      <a href="/workwithus" className="hover:text-white">
+                        Trabalhe Conosco
+                      </a>
+                    </li>
                   </ul>
                 </div>
                 <div>
@@ -508,4 +520,3 @@ export default function HomePage() {
 function auth() {
   throw new Error("Function not implemented.");
 }
-

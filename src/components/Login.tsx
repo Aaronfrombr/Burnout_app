@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import Head from "next/head";
 import { login } from "../models/api";
-import { signIn } from "next-auth/react";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -40,7 +39,7 @@ const LoginPage = () => {
     if (!token) {
       router.push("/login");
     }
-    const rememberedEmail = localStorage.getItem("rememberedEmail"); // Corrigido para usar a mesma chave
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
     const shouldRemember =
       localStorage.getItem("shouldRememberEmail") === "true";
 
@@ -74,6 +73,27 @@ const LoginPage = () => {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      // Inicia o fluxo de autenticação do Google
+      const authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      const redirectUri = encodeURIComponent(`${window.location.origin}/auth/google/callback`);
+      const scope = encodeURIComponent("profile email");
+      const responseType = "code";
+      
+      const authUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=${responseType}&access_type=offline&prompt=consent`;
+      
+      // Redireciona para a página de autenticação do Google
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error("Google login error:", error);
+      setModalType("error");
+      setModalMessage("Erro ao iniciar autenticação com Google");
+      setShowModal(true);
+    }
+  };
 
   // Simulação de login
   const handleLogin = async () => {
@@ -400,7 +420,6 @@ const LoginPage = () => {
                   </button>
                 </div>
 
-                {/* Link para registro */}
                 <div className="text-center">
                   <p className="text-sm text-gray-600">
                     Não tem uma conta?{" "}
@@ -412,7 +431,6 @@ const LoginPage = () => {
                   </p>
                 </div>
 
-                {/* Separador */}
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-300"></div>
@@ -424,11 +442,9 @@ const LoginPage = () => {
                   </div>
                 </div>
 
-                {/* Botões de login social */}
-                {/* Botões de login social - ATUALIZADO */}
-                <div className="mt-6 grid grid-cols-3 gap-3">
-                  {/* Google */}
+                <div className="mt-6 grid gap-3"> {/* Grid-cols-3 para outros botões como linkedin ou github */}
                   <button
+                    onClick={handleGoogleLogin}
                     className="flex items-center justify-center rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -448,30 +464,6 @@ const LoginPage = () => {
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                         fill="#EA4335"
                       />
-                    </svg>
-                  </button>
-
-                  {/* Facebook */}
-                  <button
-                    className="flex items-center justify-center rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      /* implementar login com Facebook */
-                    }}
-                  >
-                    <svg className="h-5 w-5" fill="#1877F2" viewBox="0 0 24 24">
-                      <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
-                    </svg>
-                  </button>
-
-                  {/* LinkedIn */}
-                  <button
-                    className="flex items-center justify-center rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      /* implementar login com LinkedIn */
-                    }}
-                  >
-                    <svg className="h-5 w-5" fill="#0A66C2" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
                     </svg>
                   </button>
                 </div>
