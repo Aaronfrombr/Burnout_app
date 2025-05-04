@@ -12,6 +12,7 @@ import {
   X,
   Check,
   AlertCircle,
+  Mail,
 } from "lucide-react";
 import Head from "next/head";
 import { useAuth } from "./useAuth";
@@ -153,7 +154,12 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
 };
 
 export default function WorkWithUsPage() {
-  //const [showModal, setShowModal] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showModal, setShowModal] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(
+    null
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { isLogged, userName } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState("psicologos");
@@ -168,12 +174,79 @@ export default function WorkWithUsPage() {
   });
 
   // Inicializa o EmailJS - Corrigido: método de inicialização correto
-//   useEffect(() => {
-//     if (process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY) {
-//       emailjs.init(process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY);
-//     }
-//   }, []);
-  
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY) {
+      emailjs.init(process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY);
+    }
+  }, []);
+
+  const validateStep1 = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.nome.trim()) {
+      newErrors.nome = "Nome completo é obrigatório";
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "E-mail é obrigatório";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "E-mail inválido";
+    }
+
+    if (!formData.telefone.trim()) {
+      newErrors.telefone = "Telefone é obrigatório";
+    }
+
+    if (!formData.curriculo) {
+      newErrors.curriculo = "Currículo é obrigatório";
+    } else if (formData.curriculo.type !== "application/pdf") {
+      newErrors.curriculo = "Apenas arquivos PDF são aceitos";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep2 = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.experiencia.trim()) {
+      newErrors.experiencia = "Experiência profissional é obrigatória";
+    } else if (formData.experiencia.trim().length < 50) {
+      newErrors.experiencia =
+        "Descreva sua experiência com mais detalhes (mínimo 50 caracteres)";
+    }
+
+    if (!formData.motivacao.trim()) {
+      newErrors.motivacao = "Carta de motivação é obrigatória";
+    } else if (formData.motivacao.trim().length < 100) {
+      newErrors.motivacao =
+        "Sua carta de motivação deve ter pelo menos 100 caracteres";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const sendEmail = async () => {
+    if (
+      !process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID ||
+      !process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID
+    ) {
+      throw new Error("EmailJS configuration is missing");
+    }
+
+    return emailjs.send(
+      process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
+      process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
+      {
+        from_name: formData.nome,
+        from_email: formData.email,
+        message: `Candidatura para ${currentRole}\n\nExperiência: ${formData.experiencia}\nMotivação: ${formData.motivacao}\nTelefone: ${formData.telefone}\nLinkedIn: ${formData.linkedin}\nPortfolio: ${formData.portfolio}`,
+        curriculo: formData.curriculo ? formData.curriculo.name : "Não enviado",
+      }
+    );
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -195,6 +268,10 @@ export default function WorkWithUsPage() {
     portfolio: "",
     concordaTermos: false,
   });
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -254,30 +331,51 @@ export default function WorkWithUsPage() {
   };
 
   const nextStep = () => {
-    setFormStep(formStep + 1);
+    let isValid = false;
+
+    if (formStep === 1) {
+      isValid = validateStep1();
+    } else if (formStep === 2) {
+      isValid = validateStep2();
+    }
+
+    if (isValid) {
+      setFormStep(formStep + 1);
+      setErrors({}); // Limpa os erros ao avançar
+    }
   };
 
   const prevStep = () => {
     setFormStep(formStep - 1);
   };
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would normally send the data to your backend
-    console.log("Form submitted", formData);
-    setFormSubmitted(true);
-    // Reset form
-    setFormData({
-      nome: "",
-      email: "",
-      telefone: "",
-      curriculo: null,
-      experiencia: "",
-      motivacao: "",
-      linkedin: "",
-      portfolio: "",
-      concordaTermos: false,
-    });
+    setIsSubmitting(true);
+
+    try {
+      await sendEmail();
+      setSubmitStatus("success");
+      setFormSubmitted(true);
+      setFormData({
+        nome: "",
+        email: "",
+        telefone: "",
+        curriculo: null,
+        experiencia: "",
+        motivacao: "",
+        linkedin: "",
+        portfolio: "",
+        concordaTermos: false,
+      });
+      setShowModal(true);
+    } catch (error) {
+      console.error("Error sending email:", error);
+      setSubmitStatus("error");
+      setShowModal(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const closeForm = () => {
@@ -848,9 +946,18 @@ export default function WorkWithUsPage() {
                               value={formData.nome}
                               onChange={handleInputChange}
                               required
-                              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                errors.nome
+                                  ? "border-red-500 focus:ring-red-500"
+                                  : "focus:ring-indigo-500"
+                              }`}
                               placeholder="Seu nome completo"
                             />
+                            {errors.nome && (
+                              <p className="mt-1 text-sm text-red-600">
+                                {errors.nome}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <label
@@ -866,9 +973,18 @@ export default function WorkWithUsPage() {
                               value={formData.email}
                               onChange={handleInputChange}
                               required
-                              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                errors.email
+                                  ? "border-red-500 focus:ring-red-500"
+                                  : "focus:ring-indigo-500"
+                              }`}
                               placeholder="seu.email@exemplo.com"
                             />
+                            {errors.email && (
+                              <p className="mt-1 text-sm text-red-600">
+                                {errors.email}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div>
@@ -885,9 +1001,18 @@ export default function WorkWithUsPage() {
                             value={formData.telefone}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                              errors.telefone
+                                ? "border-red-500 focus:ring-red-500"
+                                : "focus:ring-indigo-500"
+                            }`}
                             placeholder="(00) 00000-0000"
                           />
+                          {errors.telefone && (
+                            <p className="mt-1 text-sm text-red-600">
+                              {errors.telefone}
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label
@@ -903,11 +1028,20 @@ export default function WorkWithUsPage() {
                             onChange={handleInputChange}
                             accept=".pdf"
                             required
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                              errors.curriculo
+                                ? "border-red-500 focus:ring-red-500"
+                                : "focus:ring-indigo-500"
+                            }`}
                           />
                           <p className="text-sm text-gray-500 mt-1">
                             Apenas arquivos PDF. Máximo 5 MB.
                           </p>
+                          {errors.curriculo && (
+                            <p className="mt-1 text-sm text-red-600">
+                              {errors.curriculo}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -928,9 +1062,21 @@ export default function WorkWithUsPage() {
                             onChange={handleInputChange}
                             required
                             rows={4}
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                              errors.experiencia
+                                ? "border-red-500 focus:ring-red-500"
+                                : "focus:ring-indigo-500"
+                            }`}
                             placeholder="Descreva sua experiência relevante para esta vaga..."
                           ></textarea>
+                          {errors.experiencia && (
+                            <p className="mt-1 text-sm text-red-600">
+                              {errors.experiencia}
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-500 mt-1">
+                            {formData.experiencia.length}/50 caracteres mínimos
+                          </p>
                         </div>
                         <div>
                           <label
@@ -946,9 +1092,18 @@ export default function WorkWithUsPage() {
                             onChange={handleInputChange}
                             required
                             rows={4}
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                              errors.motivacao
+                                ? "border-red-500 focus:ring-red-500"
+                                : "focus:ring-indigo-500"
+                            }`}
                             placeholder="Por que você quer trabalhar na EmotionTrack e o que te motiva nesta vaga?"
                           ></textarea>
+                          {errors.motivacao && (
+                            <p className="mt-1 text-sm text-red-600">
+                              {errors.motivacao}
+                            </p>
+                          )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
@@ -1072,19 +1227,48 @@ export default function WorkWithUsPage() {
 
                       {formStep < 3 ? (
                         <button
-                          type="button"
-                          onClick={nextStep}
-                          className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors ml-auto"
-                        >
-                          Próximo
-                        </button>
+                        type="button"
+                        onClick={nextStep}
+                        className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors ml-auto"
+                      >
+                        Próximo
+                      </button>
                       ) : (
                         <button
                           type="submit"
+                          disabled={isSubmitting}
                           className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors ml-auto flex items-center gap-2"
                         >
-                          <span>Enviar Candidatura</span>
-                          <Send className="h-4 w-4" />
+                          {isSubmitting ? (
+                            <>
+                              <svg
+                                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                ></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                              </svg>
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <span>Enviar Candidatura</span>
+                              <Send className="h-4 w-4" />
+                            </>
+                          )}
                         </button>
                       )}
                     </div>
@@ -1224,42 +1408,57 @@ export default function WorkWithUsPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 py-16">
-          <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold text-white mb-6">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 py-16 relative overflow-hidden">
+          <div className="container mx-auto px-4 text-center relative z-10">
+            <h2 className="text-4xl font-bold text-white mb-6">
               Ainda está em dúvida?
             </h2>
-            <p className="text-indigo-100 max-w-2xl mx-auto mb-8">
-              Se você não encontrou uma vaga que corresponda ao seu perfil, mas
-              acredita que pode contribuir para nossa missão, envie-nos seu
-              currículo. Estamos sempre em busca de talentos!
-            </p>
 
-            <form
-              onSubmit={handleSubmit}
-              className="flex flex-col items-center gap-6"
-            >
-              {/* problema de selecionar arquivos */}
-              <label className="relative cursor-pointer bg-white text-indigo-600 font-medium px-6 py-3 rounded-lg shadow hover:bg-indigo-50 transition-colors">
-                Selecionar Currículo
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-              </label>
+            <div className="max-w-2xl mx-auto">
+              <p className="text-indigo-100 text-lg mb-8 leading-relaxed">
+                Se você não encontrou uma vaga que corresponda ao seu perfil,
+                mas acredita que pode contribuir para nossa missão, envie-nos
+                seu currículo. Estamos sempre em busca de talentos!
+              </p>
 
-              <button
-                type="submit"
-                className="px-8 py-3 bg-indigo-800 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Enviar Currículo
-              </button>
-            </form>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 inline-block">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-white font-medium">
+                      Envie seu currículo para:
+                    </p>
+                    <div className="space-y-1">
+                      <a
+                        href="mailto:dsglucass@gmail.com"
+                        className="text-indigo-100 hover:text-white transition-colors block"
+                      >
+                        dsglucass@gmail.com
+                      </a>
+                      <a
+                        href="mailto:aaron.msilva56@gmail.com"
+                        className="text-indigo-100 hover:text-white transition-colors block"
+                      >
+                        aaron.msilva56@gmail.com
+                      </a>
+                    </div>
+                  </div>
+
+                  <button
+                    className="mt-4 px-6 py-2 bg-white text-indigo-600 font-medium rounded-lg hover:bg-indigo-50 transition-all"
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        "dsglucass@gmail.com, aaron.msilva56@gmail.com"
+                      )
+                    }
+                  >
+                    Copiar e-mails
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="bg-gray-800 text-gray-300 py-12">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row justify-between">
@@ -1352,6 +1551,16 @@ export default function WorkWithUsPage() {
             </div>
           </div>
         </footer>
+        <NotificationModal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          status={submitStatus}
+          message={
+            submitStatus === "success"
+              ? "Sua candidatura foi enviada com sucesso! Entraremos em contato em breve."
+              : "Ocorreu um erro ao enviar sua candidatura. Por favor, tente novamente mais tarde."
+          }
+        />
       </div>
     </>
   );
