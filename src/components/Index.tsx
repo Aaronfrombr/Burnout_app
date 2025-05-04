@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { EmotionTrackChatbot } from './ChatBot';
 import {
   MessageSquare,
   BarChart2,
@@ -323,51 +324,8 @@ export default function HomePage() {
           <h2 id="chatbot" className="text-3xl font-bold text-center mb-12">
             Experimente nosso Chatbot
           </h2>
-          <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="p-4 bg-indigo-600 text-white flex items-center">
-              <MessageSquare className="h-5 w-5 mr-2" />
-              <h3 className="font-medium">Assistente EmotionTrack</h3>
-            </div>
-            <div className="h-96 p-4 overflow-y-auto">
-              {messages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`mb-4 flex ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-3/4 rounded-lg p-3 ${
-                      msg.role === "user"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-4 border-t">
-              <div className="flex">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Digite sua mensagem..."
-                  className="flex-1 px-4 py-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-r-lg hover:bg-indigo-700"
-                >
-                  <Send className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <p className="text-center mt-6 text-gray-600">
+          <EmotionTrackChatbot />
+          <p className="text-center mt-10 text-gray-600">
             Este é apenas um exemplo. No produto final, o chatbot utilizará
             análise avançada de emoções e inteligência artificial para fornecer
             respostas personalizadas.

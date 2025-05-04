@@ -737,27 +737,24 @@ export default function Dashboard() {
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-gray-700 font-medium mb-3">
-                        Reportar
+                      <h3 className="text-gray-700 font-medium">
+                        Relatório Individual
                       </h3>
-                      <span className="text-black">
-                        Nesta seção, será necessário que a partir de um certo
-                        nível/porcentagem de estresse a IA automaticamente gere
-                        um diagnóstico e um alerta, juntamente com o envio para
-                        uma autoridade. Porém, o usuário pode gerar este
-                        relatório por escrito que a IA gera a partir da análise
-                        efetuada.
+                      <span className="text-black font-bold text-purple-700 text-sm bg-gray-300 rounded-lg px-2">
+                        O usuário efetuará um relatório individual com base na análise das emoções efetuada em tempo real e encaminhará para uma autoridade.
                       </span>
-                      <button
-                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                          !data.labels || data.labels.length === 0
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700 text-white"
-                        }`}
-                      >
-                        <NotepadText className="mr-2" size={18} />
-                        Gerar Relatório
-                      </button>
+                      <a href="/report">
+                        <button
+                          className={`w-full mt-3 px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            !data.labels || data.labels.length === 0
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "bg-purple-600 hover:bg-gray-700 text-white"
+                          }`}
+                        >
+                          <NotepadText className="mr-2" size={18} />
+                          Gerar Relatório
+                        </button>
+                      </a>
                     </div>
                   </>
                 ) : (
