@@ -44,28 +44,20 @@ export default function Dashboard() {
   const { isLogged, userName } = useAuth();
 
   // Estados da análise
-  const [data, setData] = useState<ChartData<"bar">>({
-    labels: [
-      "felicidade",
-      "tristeza",
-      "raiva",
-      "estresse",
-      "nojo",
-      "surpresa",
-      "neutro",
-    ],
+  const [data, setData] = useState<ChartData<"bar", number[], string>>({
+    labels: ["Felicidade", "Tristeza", "Raiva", "Estresse", "Nojo", "Surpresa", "Neutro"],
     datasets: [
       {
         label: "Emoções Detectadas",
         data: [0, 0, 0, 0, 0, 0, 0],
         backgroundColor: [
-          "rgba(34, 197, 94, 0.85)", // verde mais moderno
-          "rgba(239, 68, 68, 0.85)", // vermelho mais moderno
-          "rgba(59, 130, 246, 0.85)", // azul mais moderno
-          "rgba(168, 85, 247, 0.85)", // roxo mais moderno
-          "rgba(14, 165, 233, 0.85)", // ciano mais moderno
-          "rgba(234, 179, 8, 0.85)", // amarelo mais moderno
-          "rgba(107, 114, 128, 0.85)", // cinza mais moderno
+          "rgba(34, 197, 94, 0.85)",
+          "rgba(239, 68, 68, 0.85)",
+          "rgba(59, 130, 246, 0.85)",
+          "rgba(168, 85, 247, 0.85)",
+          "rgba(14, 165, 233, 0.85)",
+          "rgba(234, 179, 8, 0.85)",
+          "rgba(107, 114, 128, 0.85)",
         ],
       },
     ],
@@ -77,15 +69,58 @@ export default function Dashboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [mode, setMode] = useState<"singleImage" | "continuous">("singleImage");
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [dominantEmotion, setDominantEmotion] = useState<string>("Nenhuma");
+  const [ws, setWs] = useState<WebSocket | null>(null);
 
   // Refs
-  const dataPollingInterval = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animationRef = useRef<number | null>(null);
+
+  const emotionMap: Record<string, string> = {
+    happy: "Felicidade",
+    sad: "Tristeza",
+    angry: "Raiva",
+    fear: "Estresse",
+    disgust: "Nojo",
+    surprise: "Surpresa",
+    neutral: "Neutro"
+  };
+
+  // Inicializar câmera
+  const initCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (err) {
+      setErrorMessage("Não foi possível acessar a câmera");
+      console.error("Erro ao acessar câmera:", err);
+    }
+  };
+
+  // Parar câmera
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+  };
 
   // Autenticação
-
   useEffect(() => {
+    if (isLogged) {
+      initCamera();
+    }
     const checkServerStatus = async () => {
       try {
         const response = await fetch("http://localhost:8000/health");
@@ -99,310 +134,172 @@ export default function Dashboard() {
     };
 
     checkServerStatus();
-
     return () => {
-      if (dataPollingInterval.current) {
-        clearInterval(dataPollingInterval.current);
-      }
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+      stopCamera();
+      if (ws) {
+        ws.close();
       }
     };
-  }, []);
+  }, [isLogged, ws]);
 
-  // Funções de análise (mantidas iguais)
-  const setupVideoStream = async () => {
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+  // Atualizar gráfico
+  const updateChartData = (emotionData: Record<string, number>) => {
+    const labels = ["Felicidade", "Tristeza", "Raiva", "Estresse", "Nojo", "Surpresa", "Neutro"];
+    
+    const values = labels.map(label => {
+      const key = Object.keys(emotionMap).find(k => emotionMap[k] === label);
+      return key ? emotionData[key] || 0 : 0;
+    });
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
-      });
-
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-
-      return stream;
-    } catch (error) {
-      console.error("Erro ao acessar câmera:", error);
-      setErrorMessage(
-        "Não foi possível acessar a câmera. Verifique as permissões."
-      );
-      throw error;
-    }
-  };
-
-  const captureImage = async () => {
-    try {
-      let stream = streamRef.current;
-      if (!stream) {
-        stream = await setupVideoStream();
-      }
-
-      let video = videoRef.current;
-      if (!video) {
-        video = document.createElement("video");
-        video.srcObject = stream;
-        await video.play();
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        throw new Error("Não foi possível criar contexto de canvas");
-      }
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      setLastImageUrl(canvas.toDataURL("image/jpeg"));
-
-      return new Promise<Blob>((resolve) => {
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              throw new Error("Falha ao converter canvas para blob");
-            }
-          },
-          "image/jpeg",
-          0.9
-        );
-      });
-    } catch (error) {
-      console.error("Erro ao capturar imagem:", error);
-      setErrorMessage("Não foi possível capturar imagem da câmera");
-      throw error;
-    }
+    setData(prevData => ({
+      labels,
+      datasets: [{
+        ...prevData.datasets[0],
+        data: values
+      }]
+    }));
   };
 
   const analyzeSingleImage = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    setIsLoading(true);
+    setErrorMessage("");
+    
     try {
-      setIsLoading(true);
-      setErrorMessage("");
-
-      const imageBlob = await captureImage();
-
-      const formData = new FormData();
-      formData.append("file", imageBlob, "image.jpg");
-
-      const response = await fetch("http://localhost:8000/analyze-emotion/", {
-        method: "POST",
-        body: formData,
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) return;
+      
+      // Capturar frame do vídeo
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      // Obter URL da imagem para exibição
+      const imageUrl = canvas.toDataURL('image/jpeg');
+      setLastImageUrl(imageUrl);
+      
+      // Enviar para análise
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Falha ao criar blob da imagem"));
+        }, 'image/jpeg', 0.95);
       });
-
+      
+      const formData = new FormData();
+      formData.append('file', blob, 'capture.jpg');
+      
+      const response = await fetch('http://localhost:8000/analyze/image', {
+        method: 'POST',
+        body: formData
+      });
+      
       if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status}`);
+        throw new Error('Erro na análise da imagem');
       }
-
+      
       const result = await response.json();
-      console.log("Resultado da análise:", result);
-
-      if (Object.keys(result).length === 0) {
-        setErrorMessage("Nenhuma emoção detectada na imagem");
-        return;
+      
+      if (result.success) {
+        updateChartData(result.result.emotions);
+        setDominantEmotion(emotionMap[result.result.dominant_emotion] || "Nenhuma");
+        setTotalAnalyzed(prev => prev + 1);
       }
-
-      updateChartData(result);
-    } catch (error) {
-      console.error("Erro ao analisar imagem:", error);
-      setErrorMessage(
-        "Erro ao analisar imagem. Verifique o console para detalhes."
-      );
+    } catch (err) {
+      console.error("Erro na análise:", err);
+      setErrorMessage("Erro ao analisar imagem. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const startContinuousAnalysis = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
-
-      await setupVideoStream();
-
-      const response = await fetch(
-        "http://localhost:8000/start-continuous-analysis/",
-        {
-          method: "POST",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Erro ao iniciar análise contínua: ${response.status}`);
+    if (!isLogged) return;
+    
+    setIsAnalyzing(true);
+    setErrorMessage("");
+    setTotalAnalyzed(0);
+    
+    // Conectar ao WebSocket
+    const websocket = new WebSocket('ws://localhost:8000/ws/analyze');
+    setWs(websocket);
+    
+    websocket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.type === 'analysis_result') {
+        updateChartData(message.data.emotions);
+        setDominantEmotion(emotionMap[message.data.dominant_emotion] || "Nenhuma");
+        setTotalAnalyzed(prev => prev + 1);
       }
-
-      const result = await response.json();
-      console.log(result.message);
-
-      setIsAnalyzing(true);
-      setTotalAnalyzed(0);
-
-      if (dataPollingInterval.current) {
-        clearInterval(dataPollingInterval.current);
+    };
+    
+    websocket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setErrorMessage("Erro na conexão com o servidor");
+      stopContinuousAnalysis();
+    };
+    
+    websocket.onclose = () => {
+      if (isAnalyzing) {
+        setErrorMessage("Conexão com o servidor foi fechada");
       }
-
-      dataPollingInterval.current = setInterval(fetchEmotionData, 300);
-      await captureImage();
-    } catch (error) {
-      console.error("Erro ao iniciar análise contínua:", error);
-      setErrorMessage("Erro ao iniciar a análise contínua");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const captureFrame = async () => {
-    try {
-      if (!videoRef.current || !streamRef.current) return;
-
-      const video = videoRef.current;
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) return;
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageUrl = canvas.toDataURL("image/jpeg");
-      setLastImageUrl(imageUrl);
-
-      return new Promise<Blob>((resolve) => {
-        canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob);
-          },
-          "image/jpeg",
-          0.8
-        );
-      });
-    } catch (error) {
-      console.error("Erro ao capturar frame:", error);
-    }
-  };
-
-  const stopContinuousAnalysis = async () => {
-    try {
-      setIsLoading(true);
-
-      if (dataPollingInterval.current) {
-        clearInterval(dataPollingInterval.current);
-        dataPollingInterval.current = null;
-      }
-
-      const response = await fetch(
-        "http://localhost:8000/stop-continuous-analysis/",
-        {
-          method: "POST",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Erro ao parar análise: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log(result.message);
-
-      await fetchEmotionData();
       setIsAnalyzing(false);
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-    } catch (error) {
-      console.error("Erro ao parar análise:", error);
-      setErrorMessage("Erro ao parar a análise");
-      setIsAnalyzing(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchEmotionData = async () => {
-    try {
-      const [response, imageBlob] = await Promise.all([
-        fetch("http://localhost:8000/get-emotion-data/"),
-        captureFrame(),
-      ]);
-
-      if (!response.ok) throw new Error(`Erro: ${response.status}`);
-
-      const emotionData = await response.json();
-      console.log("Dados recebidos:", emotionData);
-
-      updateChartData(emotionData);
-      setTotalAnalyzed((prev) => prev + 1);
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-      setErrorMessage("Erro ao receber dados da análise contínua");
-    }
-  };
-
-  const updateChartData = (emotionData: Record<string, number>) => {
-    const defaultLabels = [
-      "Felicidade",
-      "Tristeza",
-      "Raiva",
-      "Estresse",
-      "Nojo",
-      "Surpresa",
-      "Neutro",
-    ];
-
-    const values = defaultLabels.map((label) => {
-      return emotionData[label] || 0;
-    });
-
-    const updatedData = {
-      labels: defaultLabels,
-      datasets: [
-        {
-          label: "Emoções Detectadas",
-          data: values,
-          backgroundColor: [
-            "rgba(34, 197, 94, 0.85)", // verde mais moderno
-            "rgba(239, 68, 68, 0.85)", // vermelho mais moderno
-            "rgba(59, 130, 246, 0.85)", // azul mais moderno
-            "rgba(168, 85, 247, 0.85)", // roxo mais moderno
-            "rgba(14, 165, 233, 0.85)", // ciano mais moderno
-            "rgba(234, 179, 8, 0.85)", // amarelo mais moderno
-            "rgba(107, 114, 128, 0.85)", // cinza mais moderno
-          ],
-        },
-      ],
     };
 
-    setData(updatedData);
+    // Iniciar captura de frames
+    const sendFrame = () => {
+      if (!isAnalyzing || !videoRef.current || !canvasRef.current || websocket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) return;
+      
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      // Obter URL da última imagem para exibição
+      const imageUrl = canvas.toDataURL('image/jpeg');
+      setLastImageUrl(imageUrl);
+      
+      // Enviar frame via WebSocket
+      websocket.send(canvas.toDataURL('image/jpeg', 0.7));
+      
+      animationRef.current = requestAnimationFrame(sendFrame);
+    };
+    
+    animationRef.current = requestAnimationFrame(sendFrame);
   };
 
+  // Parar análise contínua
+  const stopContinuousAnalysis = () => {
+    setIsAnalyzing(false);
+    if (ws) {
+      ws.close();
+      setWs(null);
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+  };
+
+  // Exportar dados
   const exportData = () => {
     if (!data.labels || !data.datasets[0].data) return;
-
-    const labels = data.labels;
-    const values = data.datasets[0].data;
-
+    
     const csvContent = [
       "Emoção,Contagem",
-      ...labels.map((label, index) => `${label},${values[index]}`),
+      ...data.labels.map((label, index) => `${label},${data.datasets[0].data[index]}`)
     ].join("\n");
-
+    
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -419,7 +316,7 @@ export default function Dashboard() {
     localStorage.removeItem("userData");
     sessionStorage.removeItem("authToken");
     sessionStorage.removeItem("userData");
-    window.location.href = "/";
+    router.push("/");
   };
 
   const options: ChartOptions<"bar"> = {
@@ -454,7 +351,7 @@ export default function Dashboard() {
     let highestIndex = 0;
     let highestValue = 0;
 
-    data.datasets[0].data.forEach((value: any, index) => {
+    data.datasets[0].data.forEach((value: number, index) => {
       if (value > highestValue) {
         highestValue = value as number;
         highestIndex = index;
@@ -590,51 +487,64 @@ export default function Dashboard() {
                 {/* Mode Selection */}
                 {isLogged ? (
                   <>
-                    <>
-                      <div>
-                        <h3 className="text-gray-700 font-medium mb-3">
-                          Modo de Análise
-                        </h3>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Modo de Análise
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setMode("singleImage")}
+                          className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            mode === "singleImage"
+                              ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
+                              : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
+                          }`}
+                        >
+                          <Camera className="mr-2" size={18} />
+                          <span>Imagem Única</span>
+                        </button>
+                        <button
+                          onClick={() => setMode("continuous")}
+                          className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            mode === "continuous"
+                              ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
+                              : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
+                          }`}
+                        >
+                          <Timer className="mr-2" size={18} />
+                          <span>Análise Contínua</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Controles
+                      </h3>
+                      {mode === "singleImage" ? (
+                        <button
+                          onClick={analyzeSingleImage}
+                          disabled={isLoading}
+                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            isLoading
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                          }`}
+                        >
+                          <Camera className="mr-2" size={18} />
+                          {isLoading ? "Analisando..." : "Capturar e Analisar"}
+                        </button>
+                      ) : (
                         <div className="grid grid-cols-2 gap-3">
                           <button
-                            onClick={() => setMode("singleImage")}
+                            onClick={startContinuousAnalysis}
+                            disabled={isLoading || isAnalyzing}
                             className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                              mode === "singleImage"
-                                ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
-                                : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
-                            }`}
-                          >
-                            <Camera className="mr-2" size={18} />
-                            <span>Imagem Única</span>
-                          </button>
-                          <button
-                            onClick={() => setMode("continuous")}
-                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                              mode === "continuous"
-                                ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
-                                : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
-                            }`}
-                          >
-                            <Timer className="mr-2" size={18} />
-                            <span>Análise Contínua</span>
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-gray-700 font-medium mb-3">
-                          Controles
-                        </h3>
-                        {mode === "singleImage" ? (
-                          <button
-                            onClick={analyzeSingleImage}
-                            disabled={isLoading}
-                            className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                              isLoading
+                              isLoading || isAnalyzing
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                                : "bg-green-600 hover:bg-green-700 text-white"
                             }`}
                           >
-                            <Camera className="mr-2" size={18} />
+                            <Play className="mr-2" size={18} />
                             {isLoading ? (
                               <span className="flex items-center">
                                 <svg
@@ -657,68 +567,28 @@ export default function Dashboard() {
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                   ></path>
                                 </svg>
-                                Analisando...
+                                Iniciando...
                               </span>
                             ) : (
-                              "Capturar e Analisar"
+                              "Iniciar"
                             )}
                           </button>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              onClick={startContinuousAnalysis}
-                              disabled={isLoading || isAnalyzing}
-                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                                isLoading || isAnalyzing
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-green-600 hover:bg-green-700 text-white"
-                              }`}
-                            >
-                              <Play className="mr-2" size={18} />
-                              {isLoading ? (
-                                <span className="flex items-center">
-                                  <svg
-                                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                  </svg>
-                                  Iniciando...
-                                </span>
-                              ) : (
-                                "Iniciar"
-                              )}
-                            </button>
-                            <button
-                              onClick={stopContinuousAnalysis}
-                              disabled={!isAnalyzing || isLoading}
-                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                                !isAnalyzing || isLoading
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-red-600 hover:bg-red-700 text-white"
-                              }`}
-                            >
-                              <Square className="mr-2" size={18} />
-                              Parar
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </>
+                          <button
+                            onClick={stopContinuousAnalysis}
+                            disabled={!isAnalyzing || isLoading}
+                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              !isAnalyzing || isLoading
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : "bg-red-600 hover:bg-red-700 text-white"
+                            }`}
+                          >
+                            <Square className="mr-2" size={18} />
+                            Parar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <h3 className="text-gray-700 font-medium mb-3">
                         Exportação
@@ -740,15 +610,15 @@ export default function Dashboard() {
                       <h3 className="text-gray-700 font-medium">
                         Relatório Individual
                       </h3>
-                      <span className="text-black font-bold text-purple-700 text-sm bg-gray-300 rounded-lg px-2">
+                      <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
                         O usuário efetuará um relatório individual com base na análise das emoções efetuada em tempo real e encaminhará para uma autoridade.
                       </span>
                       <a href="/report">
                         <button
-                          className={`w-full mt-3 px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
                             !data.labels || data.labels.length === 0
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "bg-purple-600 hover:bg-gray-700 text-white"
+                              : "bg-purple-600 hover:bg-purple-700 text-white"
                           }`}
                         >
                           <NotepadText className="mr-2" size={18} />
@@ -759,60 +629,97 @@ export default function Dashboard() {
                   </>
                 ) : (
                   <>
-                    <>
-                      <div>
-                        <div className="flex items-center space-x-3 group cursor-pointer">
-                          <h1 className="flex items-center text-3xl font-bold text-black transition-all duration-300 group-hover:tracking-wider mb-6">
-                            <span>
-                              Você precisa entrar para acessar este recurso.
+                    <div>
+                      <div className="flex items-center space-x-3 group cursor-pointer">
+                        <h1 className="flex items-center text-xl font-bold text-black transition-all duration-300 group-hover:tracking-wider mb-6">
+                          <span>
+                            Você precisa entrar para acessar este recurso.
+                          </span>
+                        </h1>
+                      </div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Modo de Análise
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          disabled
+                          onClick={() => setMode("singleImage")}
+                          className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            mode === "singleImage"
+                              ? "text-indigo-700 border-2"
+                              : "bg-gray-300 text-black"
+                          }`}
+                        >
+                          <Camera className="mr-2" size={18} />
+                          <span>Imagem Única</span>
+                        </button>
+                        <button
+                          disabled
+                          onClick={() => setMode("continuous")}
+                          className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            mode === "continuous"
+                              ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
+                              : "text-gray-700 border border-gray-200"
+                          }`}
+                        >
+                          <Timer className="mr-2" size={18} />
+                          <span>Análise Contínua</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Controles
+                      </h3>
+                      {mode === "singleImage" ? (
+                        <button
+                          disabled
+                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                            isLoading
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "bg-gray-300 text-black"
+                          }`}
+                        >
+                          <Camera className="mr-2" size={18} />
+                          {isLoading ? (
+                            <span className="flex items-center">
+                              <svg
+                                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                ></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                              </svg>
+                              Analisando...
                             </span>
-                          </h1>
-                        </div>
-                        <h3 className="text-gray-700 font-medium mb-3">
-                          Modo de Análise
-                        </h3>
+                          ) : (
+                            "Capturar e Analisar"
+                          )}
+                        </button>
+                      ) : (
                         <div className="grid grid-cols-2 gap-3">
                           <button
                             disabled
-                            onClick={() => setMode("singleImage")}
                             className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                              mode === "singleImage"
-                                ? "text-indigo-700 border-2"
-                                : "bg-gray-300 text-black"
-                            }`}
-                          >
-                            <Camera className="mr-2" size={18} />
-                            <span>Imagem Única</span>
-                          </button>
-                          <button
-                            disabled
-                            onClick={() => setMode("continuous")}
-                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                              mode === "continuous"
-                                ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-500"
-                                : "text-gray-700 border border-gray-200"
-                            }`}
-                          >
-                            <Timer className="mr-2" size={18} />
-                            <span>Análise Contínua</span>
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-gray-700 font-medium mb-3">
-                          Controles
-                        </h3>
-                        {mode === "singleImage" ? (
-                          <button
-                            onClick={analyzeSingleImage}
-                            disabled
-                            className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                              isLoading
+                              isLoading || isAnalyzing
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                 : "bg-gray-300 text-black"
                             }`}
                           >
-                            <Camera className="mr-2" size={18} />
+                            <Play className="mr-2" size={18} />
                             {isLoading ? (
                               <span className="flex items-center">
                                 <svg
@@ -835,59 +742,18 @@ export default function Dashboard() {
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                   ></path>
                                 </svg>
-                                Analisando...
+                                Iniciando...
                               </span>
                             ) : (
-                              "Capturar e Analisar"
+                              "Iniciar"
                             )}
                           </button>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              onClick={startContinuousAnalysis}
-                              disabled
-                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                                isLoading || isAnalyzing
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-gray-300 text-black"
-                              }`}
-                            >
-                              <Play className="mr-2" size={18} />
-                              {isLoading ? (
-                                <span className="flex items-center">
-                                  <svg
-                                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                  </svg>
-                                  Iniciando...
-                                </span>
-                              ) : (
-                                "Iniciar"
-                              )}
-                            </button>
-                            <button
-                              onClick={stopContinuousAnalysis}
+                          <button
                               disabled
                               className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
                                 !isAnalyzing || isLoading
                                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-gray-300 text-black"
+                                  : "bg-red-600 hover:bg-red-700 text-white"
                               }`}
                             >
                               <Square className="mr-2" size={18} />
@@ -896,184 +762,262 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
+                      
+                      <div>
+                        <h3 className="text-gray-700 font-medium mb-3">
+                          Exportação
+                        </h3>
+                        <button
+                          disabled
+                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
+                        >
+                          <Download className="mr-2" size={18} />
+                          Exportar CSV
+                        </button>
+                      </div>
+                      <div>
+                        <h3 className="text-gray-700 font-medium">
+                          Relatório Individual
+                        </h3>
+                        <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
+                          O usuário efetuará um relatório individual com base na análise das emoções efetuada em tempo real e encaminhará para uma autoridade.
+                        </span>
+                        <button
+                          disabled
+                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
+                        >
+                          <NotepadText className="mr-2" size={18} />
+                          Gerar Relatório
+                        </button>
+                      </div>
                     </>
-                    <div>
-                      <h3 className="text-gray-700 font-medium mb-3">
-                        Exportação
-                      </h3>
-                      <button
-                        onClick={exportData}
-                        disabled
-                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                          !data.labels || data.labels.length === 0
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : "bg-gray-300 text-black"
-                        }`}
-                      >
-                        <Download className="mr-2" size={18} />
-                        Exportar CSV
-                      </button>
-                    </div>
-                    <div>
-                      <h3 className="text-gray-700 font-medium mb-3">
-                        Reportar
-                      </h3>
-                      <button
-                        disabled
-                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                          !data.labels || data.labels.length === 0
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : "bg-gray-300 text-black"
-                        }`}
-                      >
-                        <NotepadText className="mr-2" size={18} />
-                        Gerar Relatório
-                      </button>
-                    </div>
-                  </>
-                )}
+                  )}
 
-                {/* Analysis Status */}
-                {isAnalyzing && (
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <h3 className="text-blue-800 font-medium mb-2">
-                      Status da Análise
-                    </h3>
-
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-blue-700">Frames analisados:</span>
-                      <span className="font-medium text-blue-900">
-                        {totalAnalyzed}
-                      </span>
-                    </div>
-
-                    <div className="w-full bg-blue-200 rounded-full h-2.5">
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(totalAnalyzed, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Error Message */}
+                {/* Error message */}
                 {errorMessage && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex">
-                      <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
-                      <p className="text-red-700 text-sm">{errorMessage}</p>
-                    </div>
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start">
+                    <AlertCircle size={20} className="mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm">{errorMessage}</span>
                   </div>
                 )}
+
+                {/* Status */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-gray-700 font-medium mb-2">Status</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white p-3 rounded border border-gray-200">
+                      <p className="text-xs text-gray-500">Emoção atual</p>
+                      <p className="font-medium text-gray-800">{dominantEmotion}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded border border-gray-200">
+                      <p className="text-xs text-gray-500">Frames analisados</p>
+                      <p className="font-medium text-gray-800">{totalAnalyzed}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Camera View */}
+            <div className="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-gray-800 to-gray-900 py-4 px-6">
+                <h2 className="text-white text-xl font-bold flex items-center">
+                  <Camera className="mr-2" />
+                  <span>Câmera</span>
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="bg-black rounded-lg overflow-hidden relative aspect-video">
+                  {isLogged ? (
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full h-auto"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full bg-gray-800">
+                      <div className="text-center p-6">
+                        <Camera className="mx-auto text-gray-400 mb-3" size={48} />
+                        <p className="text-gray-300">Faça login para acessar a câmera</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <canvas ref={canvasRef} className="hidden" />
               </div>
             </div>
           </div>
 
           {/* Right Panel - Results */}
           <div className="lg:col-span-3">
-            {/* Image Preview */}
-            {lastImageUrl && (
-              <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200 mb-8">
-                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6">
-                  <h2 className="text-white text-xl font-bold">
-                    Última Captura
-                  </h2>
+            {/* Breadcrumbs */}
+            <nav className="flex items-center text-sm font-medium text-white/60 mb-4">
+              <a href="/" className="hover:text-white">Início</a>
+              <ChevronRight className="h-4 w-4 mx-2" />
+              <span className="text-white">Dashboard</span>
+            </nav>
+
+            {/* Chart and Analysis */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6">
+                <h2 className="text-white text-xl font-bold flex items-center">
+                  <BarChart className="mr-2" />
+                  <span>Análise de Emoções</span>
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="h-96 mb-8">
+                  <Bar data={data} options={options} />
                 </div>
 
-                <div className="p-6">
-                  <div className="relative rounded-xl overflow-hidden shadow-inner border border-gray-200">
-                    <img
-                      src={lastImageUrl}
-                      alt="Preview"
-                      className="w-full h-auto object-contain"
-                    />
+                {/* Emotion Summary */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-gray-700 font-medium mb-3">
+                    Análise Emocional
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 col-span-2">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        Resultado da Análise
+                      </h4>
+                      <p className="text-gray-600 text-sm">
+                        {totalAnalyzed > 0
+                          ? `A análise de ${totalAnalyzed} ${
+                              totalAnalyzed === 1 ? "frame" : "frames"
+                            } indica uma predominância da emoção ${dominantEmotion.toLowerCase()}.`
+                          : "Inicie uma análise para visualizar os resultados."}
+                      </p>
+                      {totalAnalyzed > 0 && (
+                        <p className="text-gray-600 text-sm mt-2">
+                          {dominantEmotion === "Felicidade"
+                            ? "Esta expressão indica um estado emocional positivo, geralmente associado com satisfação e bem-estar."
+                            : dominantEmotion === "Tristeza"
+                            ? "Esta expressão indica um estado emocional negativo, geralmente associado com perda ou desapontamento."
+                            : dominantEmotion === "Raiva"
+                            ? "Esta expressão indica um estado emocional de irritação ou fúria, frequentemente uma resposta a injustiça percebida."
+                            : dominantEmotion === "Estresse"
+                            ? "Esta expressão indica um estado de tensão ou ansiedade, frequentemente associado com situações desafiadoras."
+                            : dominantEmotion === "Nojo"
+                            ? "Esta expressão indica uma aversão ou repulsa, frequentemente uma resposta protetora a estímulos negativos."
+                            : dominantEmotion === "Surpresa"
+                            ? "Esta expressão indica uma reação a algo inesperado ou súbito, podendo ser positiva ou negativa."
+                            : "Esta expressão indica ausência de emoções fortes ou claras no momento."}
+                        </p>
+                      )}
+                    </div>
                     <div
-                      className={`absolute bottom-0 left-0 right-0 ${getEmotionColor()} text-white py-3 px-4 font-medium text-center backdrop-blur-sm bg-opacity-90`}
+                      className={`rounded-lg p-4 flex flex-col items-center justify-center transition-all duration-300 ${
+                        totalAnalyzed > 0
+                          ? getEmotionColor() + " text-white"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
                     >
-                      <div className="flex items-center justify-center">
-                        <span className="mr-2">🎯</span>
-                        {getEmotionText()}
+                      <h4 className="text-sm font-medium mb-2">
+                        Emoção Predominante
+                      </h4>
+                      <div className="text-center">
+                        {dominantEmotion === "Felicidade" ? (
+                          <div className="text-4xl mb-2">😊</div>
+                        ) : dominantEmotion === "Tristeza" ? (
+                          <div className="text-4xl mb-2">😢</div>
+                        ) : dominantEmotion === "Raiva" ? (
+                          <div className="text-4xl mb-2">😠</div>
+                        ) : dominantEmotion === "Estresse" ? (
+                          <div className="text-4xl mb-2">😰</div>
+                        ) : dominantEmotion === "Nojo" ? (
+                          <div className="text-4xl mb-2">🤢</div>
+                        ) : dominantEmotion === "Surpresa" ? (
+                          <div className="text-4xl mb-2">😲</div>
+                        ) : (
+                          <div className="text-4xl mb-2">😐</div>
+                        )}
+                        <p className="font-bold">{dominantEmotion}</p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Chart Results */}
-            <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200">
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6">
-                <h2 className="text-white text-xl font-bold">
-                  Resultados da Análise
+            {/* Last Captured Image */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-gray-700 to-gray-800 py-4 px-6">
+                <h2 className="text-white text-xl font-bold flex items-center">
+                  <span>Última Imagem Capturada</span>
                 </h2>
               </div>
-
               <div className="p-6">
-                <div className="h-72 mb-6">
-                  <Bar
-                    data={data}
-                    options={{
-                      ...options,
-                      plugins: {
-                        ...options.plugins,
-                        tooltip: {
-                          callbacks: {
-                            label: (context) =>
-                              `${context.label}: ${context.raw}%`,
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
-                  {data.labels &&
-                    data.labels.map((label: any, index: any) => (
-                      <div
-                        key={index}
-                        className="flex items-center bg-gray-50 px-3 py-2 rounded-md"
-                      >
-                        <div
-                          className="w-3 h-3 rounded-full mr-2"
-                          style={{
-                            backgroundColor: (
-                              data.datasets[0].backgroundColor as string[]
-                            )[index],
-                          }}
-                        ></div>
-                        <span className="text-sm text-gray-700">{label}</span>
-                      </div>
-                    ))}
-                </div>
-
-                {/* Info Panel */}
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                  <h3 className="text-blue-800 font-medium mb-2 flex items-center">
-                    <ChevronRight size={18} className="mr-1" />
-                    Sobre a Análise
-                  </h3>
-                  <p className="text-blue-700 text-sm">
-                    Este sistema detecta expressões faciais em tempo real usando
-                    visão computacional. As emoções são classificadas com base
-                    nos padrões faciais detectados.
-                  </p>
-                </div>
+                {lastImageUrl ? (
+                  <div className="rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={lastImageUrl}
+                      alt="Última imagem capturada"
+                      className="w-full h-auto"
+                    />
+                  </div>
+                ) : (
+                  <div className="bg-gray-100 rounded-lg p-8 flex flex-col items-center justify-center">
+                    <Camera className="text-gray-400 mb-3" size={48} />
+                    <p className="text-gray-500 text-center">
+                      Nenhuma imagem capturada ainda. Inicie uma análise para visualizar.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Hidden video element */}
-      <video
-        ref={videoRef}
-        style={{ display: "none" }}
-        width="640"
-        height="480"
-        muted
-        playsInline
-      />
+      {/* Footer */}
+      <footer className="bg-gradient-to-r from-gray-900 to-black py-8 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+              <h3 className="text-white text-lg font-bold mb-4 flex items-center">
+                <Brain className="mr-2" size={20} />
+                EmotionTrack
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Sistema de análise de emoções faciais em tempo real para monitoramento e avaliação emocional.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-white text-lg font-bold mb-4">Links Rápidos</h3>
+              <ul className="space-y-2">
+                <li>
+                  <a href="/" className="text-gray-400 hover:text-white transition duration-200">Página Inicial</a>
+                </li>
+                <li>
+                  <a href="/login" className="text-gray-400 hover:text-white transition duration-200">Login</a>
+                </li>
+                <li>
+                  <a href="/register" className="text-gray-400 hover:text-white transition duration-200">Cadastro</a>
+                </li>
+                <li>
+                  <a href="/report" className="text-gray-400 hover:text-white transition duration-200">Relatórios</a>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-white text-lg font-bold mb-4">Contato</h3>
+              <p className="text-gray-400 text-sm mb-2">
+                Envie dúvidas ou sugestões para nossa equipe.
+              </p>
+              <a href="mailto:contato@emotiontrack.com" className="text-indigo-400 hover:text-indigo-300 transition duration-200">
+                contato@emotiontrack.com
+              </a>
+            </div>
+          </div>
+          <div className="border-t border-gray-800 mt-8 pt-6 text-center">
+            <p className="text-gray-500 text-sm">
+              &copy; {new Date().getFullYear()} EmotionTrack. Todos os direitos reservados.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

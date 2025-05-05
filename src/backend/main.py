@@ -1,5 +1,4 @@
-import token
-from fastapi import FastAPI, HTTPException, Depends, Response, status, Request, Query
+from fastapi import FastAPI, HTTPException, Response, status, Request, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, EmailStr, validator
@@ -13,9 +12,13 @@ import hashlib
 import httpx
 import jwt
 import secrets
-import json
 
 # Carrega variáveis de ambiente
+
+session_cache: Dict[str, Dict[str, Any]] = {}
+
+continuous_analysis_data = {}
+
 load_dotenv()
 
 app = FastAPI()
@@ -70,6 +73,11 @@ class OAuthUser(BaseModel):
     provider: str
     provider_id: str
     picture: Optional[str] = None
+
+def generate_image_hash(file: UploadFile) -> str:
+    content = file.file.read()
+    file.file.seek(0)  # Reset para reutilizar o conteúdo depois
+    return hashlib.md5(content).hexdigest()    
 
 def get_db_connection():
     try:
@@ -417,7 +425,6 @@ async def handle_google_auth(request: Request):
             {"success": False, "error": "Falha na autenticação"},
             status_code=400
         )
-    
 
 @app.get("/auth/me")
 async def get_current_user(request: Request):
@@ -464,6 +471,7 @@ async def list_users():
         if conn is not None:
             conn.close()
 
+    
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
