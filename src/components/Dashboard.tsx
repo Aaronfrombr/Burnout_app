@@ -31,6 +31,7 @@ import {
   NotepadText,
 } from "lucide-react";
 import Head from "next/head";
+import { EmotionDetailsModal } from "./EmotionDetailsModal";
 
 ChartJS.register(
   CategoryScale,
@@ -73,6 +74,19 @@ export default function Dashboard() {
     ],
   });
 
+  type AlertLevel = "info" | "warning" | "critical";
+  type EmotionAlert = {
+    emotion: string;
+    level: AlertLevel;
+    percentage: number;
+    message: string;
+    timestamp: Date;
+  };
+  // Adicione esses estados
+  const [activeAlerts, setActiveAlerts] = useState<EmotionAlert[]>([]);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [currentAlert, setCurrentAlert] = useState<EmotionAlert | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [totalAnalyzed, setTotalAnalyzed] = useState(0);
@@ -81,12 +95,22 @@ export default function Dashboard() {
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
   const [dominantEmotion, setDominantEmotion] = useState<string>("Nenhuma");
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationRef = useRef<number | null>(null);
+  const [diagnosis, setDiagnosis] = useState<{
+    active: boolean;
+    type: "positive" | "negative" | null;
+    emotion: string;
+    title: string;
+    message: string;
+    solutions?: string[];
+    compliment?: string;
+  } | null>(null);
 
   const emotionMap: Record<string, string> = {
     happy: "Felicidade",
@@ -97,6 +121,91 @@ export default function Dashboard() {
     surprise: "Surpresa",
     neutral: "Neutro",
   };
+
+  const emotionThresholds = {
+    negative: {
+      // Requer 70% de intensidade por pelo menos 3 frames consecutivos
+      threshold: 0.7,
+      consecutiveFrames: 3,
+      emotions: ["sad", "angry", "stress", "disgust"],
+      messages: {
+        sad: {
+          title: "Tristeza Detectada",
+          message:
+            "Percebemos que você está se sentindo triste. Isso é completamente normal e faz parte da vida. Que tal tentar:",
+          solutions: [
+            "Respirar fundo por 1 minuto",
+            "Ligar para alguém especial",
+            "Assistir a um vídeo engraçado",
+            "Fazer uma pequena caminhada",
+          ],
+        },
+        angry: {
+          title: "Raiva Detectada",
+          message:
+            "Identificamos sinais consistentes de raiva. Lembre-se que a raiva é uma emoção válida, mas é importante lidar com ela de forma saudável:",
+          solutions: [
+            "Conte até 10 antes de agir",
+            "Tente identificar a causa real da raiva",
+            "Expresse seus sentimentos de forma assertiva",
+            "Pratique exercícios físicos para liberar a tensão",
+          ],
+        },
+        fear: {
+          title: "Estresse/Medo Detectado",
+          message:
+            "Identificamos sinais consistentes de estresse ou medo. É importante lidar com essas emoções de forma saudável:",
+          solutions: [
+            "Pratique técnicas de respiração profunda",
+            "Identifique a fonte do estresse e avalie se é realista",
+            "Converse com alguém de confiança sobre seus sentimentos",
+            "Tente se concentrar no momento presente",
+          ],
+        },
+        disgust: {
+          title: "Nojo/Desgosto Detectado",
+          message:
+            "Identificamos sinais consistentes de nojo ou desgosto. Quando essa emoção persiste, pode ser útil:",
+          solutions: [
+            "Afastar-se temporariamente da situação causadora",
+            "Refletir sobre o que realmente está causando essa reação",
+            "Praticar técnicas de relaxamento",
+            "Expressar seus sentimentos de forma adequada",
+          ],
+        },
+      },
+    },
+    positive: {
+      // Requer 80% de intensidade por pelo menos 2 frames consecutivos
+      threshold: 0.8,
+      consecutiveFrames: 2,
+      emotions: ["happy"],
+      messages: {
+        happy: {
+          title: "Felicidade Detectada!",
+          message:
+            "Que incrível ver você feliz! Continue cultivando esses momentos positivos!",
+          compliments: [
+            "Seu sorriso é contagiante!",
+            "Você ilumina o ambiente com sua alegria!",
+            "Sua energia positiva é inspiradora!",
+          ],
+        },
+      },
+    },
+  };
+
+  const [consecutiveFrames, setConsecutiveFrames] = useState<
+    Record<string, number>
+  >({
+    happy: 0,
+    sad: 0,
+    angry: 0,
+    fear: 0,
+    disgust: 0,
+    surprise: 0,
+    neutral: 0,
+  });
 
   // Inicializar câmera
   const initCamera = async () => {
@@ -110,6 +219,249 @@ export default function Dashboard() {
       setErrorMessage("Não foi possível acessar a câmera");
       console.error("Erro ao acessar câmera:", err);
     }
+  };
+
+  const checkForEmotionDiagnosis = (
+    emotions: Record<string, number>,
+    dominantEmotion: string
+  ) => {
+    // Se já houver um diagnóstico ativo, não fazemos nada
+    if (diagnosis?.active) return;
+  
+    // Atualizar contagem de frames consecutivos
+    const updatedCounts = { ...consecutiveFrames };
+    const newAlerts: EmotionAlert[] = [];
+  
+    // Zerar contadores para emoções abaixo do threshold
+    Object.keys(updatedCounts).forEach((emotion) => {
+      if (emotions[emotion] < 0.3) {
+        // Limiar mínimo para considerar
+        updatedCounts[emotion] = 0;
+      }
+    });
+  
+    // Verificar níveis de alerta para todas as emoções
+    Object.entries(emotions).forEach(([emotion, percentage]) => {
+      if (percentage >= 0.5) {
+        // Limiar mínimo para mostrar alerta
+        let level: AlertLevel = "info";
+        let message = "";
+  
+        if (percentage >= 0.8) {
+          level = "critical";
+          message = `${emotionMap[emotion]} em nível elevado (${Math.round(
+            percentage * 100
+          )}%)`;
+        } else if (percentage >= 0.65) {
+          level = "warning";
+          message = `${emotionMap[emotion]} em nível moderado (${Math.round(
+            percentage * 100
+          )}%)`;
+        } else {
+          level = "info";
+          message = `${emotionMap[emotion]} detectada (${Math.round(
+            percentage * 100
+          )}%)`;
+        }
+  
+        newAlerts.push({
+          emotion,
+          level,
+          percentage,
+          message,
+          timestamp: new Date(),
+        });
+      }
+    });
+  
+    // Atualizar alertas ativos (mantém apenas os últimos 5 segundos)
+    setActiveAlerts((prev) =>
+      [
+        ...newAlerts,
+        ...prev.filter((a) => new Date().getTime() - a.timestamp.getTime() < 5000),
+      ].slice(0, 5)
+    ); // Limita a 5 alertas
+  
+    // Mostrar o alerta mais crítico
+    if (newAlerts.length > 0) {
+      const mostCritical = newAlerts.reduce((prev, current) => {
+        // Prioridade: critical > warning > info
+        if (prev.level === "critical") return prev;
+        if (current.level === "critical") return current;
+        if (prev.level === "warning") return prev;
+        if (current.level === "warning") return current;
+        return prev;
+      }, newAlerts[0]);
+  
+      setCurrentAlert(mostCritical);
+      setShowAlertModal(true);
+    }
+  
+    // Verificar emoções negativas para diagnóstico completo
+    for (const emotion of emotionThresholds.negative.emotions) {
+      if (emotions[emotion] >= emotionThresholds.negative.threshold) {
+        updatedCounts[emotion] += 1;
+  
+        if (updatedCounts[emotion] >= emotionThresholds.negative.consecutiveFrames) {
+          const emotionMessages =
+            emotionThresholds.negative.messages[
+              emotion as keyof typeof emotionThresholds.negative.messages
+            ];
+          
+          setDiagnosis({
+            active: true,
+            type: "negative",
+            emotion,
+            title: emotionMessages.title,
+            message: emotionMessages.message,
+            solutions: emotionMessages.solutions,
+          });
+  
+          // Resetar contadores após diagnóstico
+          Object.keys(updatedCounts).forEach((e) => (updatedCounts[e] = 0));
+          setConsecutiveFrames(updatedCounts);
+          
+          // Pausar a análise contínua para emoções negativas
+          stopContinuousAnalysis();
+          return;
+        }
+      }
+    }
+  
+    // Verificar emoções positivas para diagnóstico completo
+    for (const emotion of emotionThresholds.positive.emotions) {
+      if (emotions[emotion] >= emotionThresholds.positive.threshold) {
+        updatedCounts[emotion] += 1;
+  
+        if (updatedCounts[emotion] >= emotionThresholds.positive.consecutiveFrames) {
+          const emotionMessages =
+            emotionThresholds.positive.messages[
+              emotion as keyof typeof emotionThresholds.positive.messages
+            ];
+          const randomCompliment =
+            emotionMessages.compliments[
+              Math.floor(Math.random() * emotionMessages.compliments.length)
+            ];
+  
+          setDiagnosis({
+            active: true,
+            type: "positive",
+            emotion,
+            title: emotionMessages.title,
+            message: emotionMessages.message,
+            compliment: randomCompliment,
+          });
+  
+          // Resetar apenas o contador desta emoção
+          updatedCounts[emotion] = 0;
+        }
+      }
+    }
+  
+    setConsecutiveFrames(updatedCounts);
+  };
+
+  const EmotionDiagnosisModal = () => {
+    if (!diagnosis || !diagnosis.active) return null;
+
+    const handleClose = () => {
+      setDiagnosis((prev) => (prev ? { ...prev, active: false } : null));
+
+      // Se for diagnóstico negativo, permite reiniciar a análise
+      if (diagnosis.type === "negative") {
+        // Aqui você pode adicionar lógica para reiniciar a análise se desejar
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div
+          className={`relative bg-white rounded-xl p-6 max-w-md w-full shadow-2xl transform transition-all 
+          ${
+            diagnosis.type === "positive"
+              ? "animate-bounce-in"
+              : "animate-fade-in"
+          }`}
+        >
+          {/* Header com cor baseada no tipo */}
+          <div
+            className={`absolute top-0 left-0 right-0 h-2 rounded-t-xl 
+            ${diagnosis.type === "positive" ? "bg-green-500" : "bg-red-500"}`}
+          ></div>
+
+          <button
+            onClick={handleClose}
+            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+
+          <div className="text-center mt-2">
+            <h3
+              className={`text-2xl font-bold mb-2 ${
+                diagnosis.type === "positive"
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              {diagnosis.title}
+            </h3>
+
+            <p className="text-gray-700 mb-4">{diagnosis.message}</p>
+
+            {/* Conteúdo específico para cada tipo */}
+            {diagnosis.type === "positive" && diagnosis.compliment && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                <p className="text-yellow-700 font-medium italic">
+                  "{diagnosis.compliment}"
+                </p>
+              </div>
+            )}
+
+            {diagnosis.type === "negative" && diagnosis.solutions && (
+              <div className="text-left">
+                <h4 className="font-semibold mb-2">
+                  Sugestões para se sentir melhor:
+                </h4>
+                <ul className="space-y-2">
+                  {diagnosis.solutions.map((solution, index) => (
+                    <li key={index} className="flex items-start text-black">
+                      <span className="inline-block bg-blue-100 rounded-full p-1 mr-2">
+                        <svg
+                          className="w-4 h-4 text-blue-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          ></path>
+                        </svg>
+                      </span>
+                      {solution}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <button
+              onClick={handleClose}
+              className={`mt-6 px-6 py-2 rounded-full font-medium ${
+                diagnosis.type === "positive"
+                  ? "bg-green-500 hover:bg-green-600 text-white"
+                  : "bg-red-500 hover:bg-red-600 text-white"
+              }`}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Parar câmera
@@ -131,7 +483,7 @@ export default function Dashboard() {
     if (isLogged) {
       initCamera();
     }
-  
+
     const checkServerStatus = async () => {
       try {
         const response = await fetch("http://localhost:8000/health");
@@ -143,9 +495,9 @@ export default function Dashboard() {
         setErrorMessage("Servidor indisponível. Verifique a conexão.");
       }
     };
-  
+
     checkServerStatus();
-  
+
     return () => {
       stopCamera();
       if (ws) {
@@ -153,108 +505,130 @@ export default function Dashboard() {
       }
     };
   }, [isLogged]);
-  
+
   // Efeito separado para o WebSocket
   useEffect(() => {
     let websocket: WebSocket | null = null;
     let animationId: number | null = null;
     let lastAnalysisTime = 0;
     const ANALYSIS_INTERVAL = 300; // 300ms entre análises (~3 FPS)
-  
+
     if (!isLogged || mode !== "continuous" || !isAnalyzing) return;
-  
+
     websocket = new WebSocket("ws://localhost:8000/ws/analyze");
     setWs(websocket);
-  
+
     const processMessage = (data: any) => {
       const emotionOrder = [
         "happy",
         "sad",
-        "angry", 
+        "angry",
         "fear",
         "disgust",
         "surprise",
-        "neutral"
+        "neutral",
       ];
-  
-      const newData = emotionOrder.map(emotion => {
+
+      const newData = emotionOrder.map((emotion) => {
         const value = data.emotions[emotion] || 0;
         return Math.round(value * 100) / 100;
       });
-  
-      setData(prev => ({
+
+      setData((prev) => ({
         ...prev,
-        datasets: [{
-          ...prev.datasets[0],
-          data: newData
-        }]
+        datasets: [
+          {
+            ...prev.datasets[0],
+            data: newData,
+          },
+        ],
       }));
-  
+
       setDominantEmotion(emotionMap[data.dominant_emotion] || "Nenhuma");
-      setTotalAnalyzed(prev => prev + 1);
+      setTotalAnalyzed((prev) => prev + 1);
+
+      // Verificar se precisa mostrar diagnóstico
+      checkForEmotionDiagnosis(data.emotions, data.dominant_emotion);
     };
-  
+
     const sendFrame = (timestamp: number) => {
-      if (!isAnalyzing || !websocket || websocket.readyState !== WebSocket.OPEN) {
+      if (
+        !isAnalyzing ||
+        !websocket ||
+        websocket.readyState !== WebSocket.OPEN
+      ) {
         if (animationId) cancelAnimationFrame(animationId);
         return;
       }
-  
+
       if (timestamp - lastAnalysisTime >= ANALYSIS_INTERVAL) {
         if (videoRef.current && canvasRef.current) {
           const canvas = canvasRef.current;
-          const context = canvas.getContext('2d');
+          const context = canvas.getContext("2d");
           if (!context) return;
-  
+
           canvas.width = videoRef.current.videoWidth;
           canvas.height = videoRef.current.videoHeight;
-          context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-  
-          canvas.toBlob(blob => {
-            if (blob && websocket && websocket.readyState === WebSocket.OPEN) {
-              try {
-                websocket.send(blob);
-                lastAnalysisTime = timestamp;
-              } catch (error) {
-                console.error("Erro ao enviar frame:", error);
-                setIsAnalyzing(false);
+          context.drawImage(
+            videoRef.current,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          canvas.toBlob(
+            (blob) => {
+              if (
+                blob &&
+                websocket &&
+                websocket.readyState === WebSocket.OPEN
+              ) {
+                try {
+                  websocket.send(blob);
+                  lastAnalysisTime = timestamp;
+                } catch (error) {
+                  console.error("Erro ao enviar frame:", error);
+                  setIsAnalyzing(false);
+                }
               }
-            }
-          }, 'image/jpeg', 0.7);
+            },
+            "image/jpeg",
+            0.7
+          );
         }
       }
-  
+
       animationId = requestAnimationFrame(sendFrame);
     };
-  
+
     websocket.onopen = () => {
       console.log("WebSocket conectado");
       animationId = requestAnimationFrame(sendFrame);
     };
-  
+
     websocket.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      if (message.type === 'analysis_result') {
+      if (message.type === "analysis_result") {
         processMessage(message.data);
-      }
-      else if (message.type === "ping") {
+      } else if (message.type === "ping") {
         // Responde ao ping do servidor
         if (websocket.readyState === WebSocket.OPEN) {
           websocket.send(JSON.stringify({ type: "pong" }));
         }
       }
     };
-  
+
     websocket.onerror = (error) => {
       console.error("Erro no WebSocket:", error);
       setIsAnalyzing(false);
     };
-  
+
     websocket.onclose = () => {
       console.log("WebSocket fechado");
       setIsAnalyzing(false);
     };
-  
+
     return () => {
       if (animationId) cancelAnimationFrame(animationId);
       if (websocket) {
@@ -354,35 +728,45 @@ export default function Dashboard() {
 
   const startContinuousAnalysis = async () => {
     if (!isLogged) return;
-  
+
     setIsAnalyzing(true);
     setErrorMessage("");
     setTotalAnalyzed(0);
     setData({
-      labels: ["Felicidade", "Tristeza", "Raiva", "Estresse", "Nojo", "Surpresa", "Neutro"],
-      datasets: [{
-        label: "Emoções Detectadas",
-        data: [0, 0, 0, 0, 0, 0, 0],
-        backgroundColor: [
-          "rgba(34, 197, 94, 0.85)",
-          "rgba(239, 68, 68, 0.85)",
-          "rgba(59, 130, 246, 0.85)",
-          "rgba(168, 85, 247, 0.85)",
-          "rgba(14, 165, 233, 0.85)",
-          "rgba(234, 179, 8, 0.85)",
-          "rgba(107, 114, 128, 0.85)"
-        ]
-      }]
+      labels: [
+        "Felicidade",
+        "Tristeza",
+        "Raiva",
+        "Estresse",
+        "Nojo",
+        "Surpresa",
+        "Neutro",
+      ],
+      datasets: [
+        {
+          label: "Emoções Detectadas",
+          data: [0, 0, 0, 0, 0, 0, 0],
+          backgroundColor: [
+            "rgba(34, 197, 94, 0.85)",
+            "rgba(239, 68, 68, 0.85)",
+            "rgba(59, 130, 246, 0.85)",
+            "rgba(168, 85, 247, 0.85)",
+            "rgba(14, 165, 233, 0.85)",
+            "rgba(234, 179, 8, 0.85)",
+            "rgba(107, 114, 128, 0.85)",
+          ],
+        },
+      ],
     });
-  
+
     const websocket = new WebSocket("ws://localhost:8000/ws/analyze");
     setWs(websocket);
-  
+
     // Controle de taxa de envio (3 FPS)
     const FPS = 3;
     const interval = 1000 / FPS;
     let lastSendTime = 0;
-  
+
     const sendFrame = (timestamp: number) => {
       if (!isAnalyzing || websocket.readyState !== WebSocket.OPEN) {
         if (animationRef.current) {
@@ -390,61 +774,85 @@ export default function Dashboard() {
         }
         return;
       }
-  
+
       if (timestamp - lastSendTime >= interval) {
         if (videoRef.current && canvasRef.current) {
           const canvas = canvasRef.current;
           const context = canvas.getContext("2d");
           if (!context) return;
-  
+
           canvas.width = videoRef.current.videoWidth;
           canvas.height = videoRef.current.videoHeight;
-          context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-  
+          context.drawImage(
+            videoRef.current,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
           // Usar Blob para melhor performance
-          canvas.toBlob(blob => {
-            if (blob && websocket.readyState === WebSocket.OPEN) {
-              try {
-                websocket.send(blob);
-                lastSendTime = timestamp;
-                setLastImageUrl(canvas.toDataURL("image/jpeg"));
-              } catch (error) {
-                console.error("Erro ao enviar frame:", error);
-                stopContinuousAnalysis();
+          canvas.toBlob(
+            (blob) => {
+              if (blob && websocket.readyState === WebSocket.OPEN) {
+                try {
+                  websocket.send(blob);
+                  lastSendTime = timestamp;
+                  setLastImageUrl(canvas.toDataURL("image/jpeg"));
+                } catch (error) {
+                  console.error("Erro ao enviar frame:", error);
+                  stopContinuousAnalysis();
+                }
               }
-            }
-          }, "image/jpeg", 0.7);
+            },
+            "image/jpeg",
+            0.7
+          );
         }
       }
-  
+
       animationRef.current = requestAnimationFrame(sendFrame);
     };
-  
+
     websocket.onmessage = (event) => {
       const message = JSON.parse(event.data);
       if (message.type === "analysis_result") {
-        const emotionOrder = ["happy", "sad", "angry", "fear", "disgust", "surprise", "neutral"];
-        const newData = emotionOrder.map(emotion => message.data.emotions[emotion] || 0);
-        
-        setData(prev => ({
+        const emotionOrder = [
+          "happy",
+          "sad",
+          "angry",
+          "fear",
+          "disgust",
+          "surprise",
+          "neutral",
+        ];
+        const newData = emotionOrder.map(
+          (emotion) => message.data.emotions[emotion] || 0
+        );
+
+        setData((prev) => ({
           ...prev,
-          datasets: [{
-            ...prev.datasets[0],
-            data: newData
-          }]
+          datasets: [
+            {
+              ...prev.datasets[0],
+              data: newData,
+            },
+          ],
         }));
-  
-        setDominantEmotion(emotionMap[message.data.dominant_emotion] || "Nenhuma");
-        setTotalAnalyzed(prev => prev + 1);
+
+        setDominantEmotion(
+          emotionMap[message.data.dominant_emotion] || "Nenhuma"
+        );
+        setTotalAnalyzed((prev) => prev + 1);
       }
     };
-  
+
     websocket.onerror = (error) => {
       console.error("Erro no WebSocket:", error);
       setErrorMessage("Erro na conexão com o servidor");
       stopContinuousAnalysis();
     };
-  
+
     websocket.onclose = () => {
       if (isAnalyzing) {
         setErrorMessage("Conexão com o servidor foi fechada");
@@ -454,19 +862,19 @@ export default function Dashboard() {
       }
       setIsAnalyzing(false);
     };
-  
+
     animationRef.current = requestAnimationFrame(sendFrame);
   };
-  
+
   const stopContinuousAnalysis = () => {
     setIsAnalyzing(false);
-    
+
     if (ws) {
       // Fecha a conexão com código normal (1000)
       ws.close(1000, "Encerramento solicitado pelo usuário");
       setWs(null);
     }
-    
+
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -476,24 +884,24 @@ export default function Dashboard() {
   // Exportar dados
   const exportToPDF = () => {
     if (!data?.labels || !data?.datasets?.[0]?.data) return;
-  
+
     const doc = new jsPDF();
     const now = new Date().toLocaleString("pt-BR");
-  
+
     // Título
     doc.setFontSize(16);
     doc.text("Relatório de Análise de Emoções", 14, 20);
-  
+
     // Data
     doc.setFontSize(10);
     doc.text(`Gerado em: ${now}`, 14, 28);
-  
+
     // Construir tabela
     const tableBody = data.labels.map((label, index) => [
       label,
       data.datasets[0].data[index],
     ]);
-  
+
     autoTable(doc, {
       head: [["Tipo de Emoção", "Quantidade Detectada"]],
       body: tableBody,
@@ -504,7 +912,7 @@ export default function Dashboard() {
       foot: [["Total", data.datasets[0].data.reduce((a, b) => a + b, 0)]],
       footStyles: { fillColor: [230, 230, 230] },
     });
-  
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     doc.save(`analise_emocoes_${timestamp}.pdf`);
   };
@@ -559,6 +967,147 @@ export default function Dashboard() {
     if (highestValue === 0) return "Nenhuma emoção predominante";
 
     return `Emoção predominante: ${data.labels[highestIndex]}`;
+  };
+
+  const AlertModal = () => {
+    if (!showAlertModal || !currentAlert) return null;
+
+    const getAlertConfig = () => {
+      switch (currentAlert.level) {
+        case "critical":
+          return {
+            bg: "bg-red-100 border-red-500",
+            text: "text-red-800",
+            icon: "❗",
+            title: "Alerta Importante",
+          };
+        case "warning":
+          return {
+            bg: "bg-yellow-100 border-yellow-500",
+            text: "text-yellow-800",
+            icon: "⚠️",
+            title: "Atenção",
+          };
+        default:
+          return {
+            bg: "bg-blue-100 border-blue-500",
+            text: "text-blue-800",
+            icon: "ℹ️",
+            title: "Informação",
+          };
+      }
+    };
+
+    const config = getAlertConfig();
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div
+          className={`relative border-l-4 ${config.bg} rounded-lg shadow-lg p-4 max-w-md w-full animate-fade-in`}
+        >
+          <button
+            onClick={() => setShowAlertModal(false)}
+            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+
+          <div className="flex items-start">
+            <span className="text-2xl mr-3">{config.icon}</span>
+            <div>
+              <h3 className={`font-bold text-lg ${config.text}`}>
+                {config.title}
+              </h3>
+              <p className="text-gray-700">{currentAlert.message}</p>
+
+              {/* Barra de progresso */}
+              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-3">
+                <div
+                  className={`h-2.5 rounded-full ${
+                    currentAlert.level === "critical"
+                      ? "bg-red-500"
+                      : currentAlert.level === "warning"
+                      ? "bg-yellow-500"
+                      : "bg-blue-500"
+                  }`}
+                  style={{ width: `${currentAlert.percentage * 100}%` }}
+                ></div>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-1">
+                Intensidade: {Math.round(currentAlert.percentage * 100)}%
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => setShowAlertModal(false)}
+              className={`px-4 py-2 rounded-md ${
+                currentAlert.level === "critical"
+                  ? "bg-red-500 hover:bg-red-600"
+                  : currentAlert.level === "warning"
+                  ? "bg-yellow-500 hover:bg-yellow-600"
+                  : "bg-blue-500 hover:bg-blue-600"
+              } text-white`}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const AlertHistory = () => {
+    const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  
+    if (activeAlerts.length === 0) return (
+      <div className="text-center py-4 text-gray-500">
+        Nenhum alerta recente
+      </div>
+    );
+  
+    return (
+      <>
+        <div className="space-y-2 max-h-60 overflow-y-auto">
+          {activeAlerts.map((alert, index) => (
+            <div 
+              key={index} 
+              className={`p-3 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition ${
+                alert.level === 'critical' ? 'bg-red-50 border-red-500 hover:bg-red-100' : 
+                alert.level === 'warning' ? 'bg-yellow-50 border-yellow-500 hover:bg-yellow-100' : 
+                'bg-blue-50 border-blue-500 hover:bg-blue-100'
+              }`}
+              onClick={() => setSelectedEmotion(alert.emotion)}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className={`font-medium ${
+                    alert.level === 'critical' ? 'text-red-700' : 
+                    alert.level === 'warning' ? 'text-yellow-700' : 'text-blue-700'
+                  }`}>
+                    {alert.message}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {alert.timestamp.toLocaleTimeString()}
+                  </p>
+                </div>
+                <span className="text-lg">
+                  {alert.level === 'critical' ? '❗' : 
+                   alert.level === 'warning' ? '⚠️' : 'ℹ️'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <EmotionDetailsModal 
+          emotion={selectedEmotion} 
+          onClose={() => setSelectedEmotion(null)} 
+        />
+      </>
+    );
   };
 
   const getEmotionColor = () => {
@@ -1088,6 +1637,13 @@ export default function Dashboard() {
                   <Bar data={data} options={options} />
                 </div>
 
+                <div className="mt-6 bg-white rounded-lg shadow p-4">
+                  <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                    <AlertCircle className="mr-2" size={18} />
+                    Alertas Recentes
+                  </h3>
+                  <AlertHistory />
+                </div>
                 {/* Emotion Summary */}
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <h3 className="text-gray-700 font-medium mb-3">
