@@ -34,9 +34,9 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
       <div className={`
         transform transition-all duration-500 ease-out
         animate-fadeIn
-        ${status === 'success' ? 'bg-emerald-50' : 'bg-rose-50'}
+        ${status === 'success' ? 'bg-green-50' : 'bg-red-50'}
         p-6 rounded-xl shadow-xl w-full max-w-md relative z-10
-        border-l-4 ${status === 'success' ? 'border-emerald-500' : 'border-rose-500'}
+        border-l-4 ${status === 'success' ? 'border-green-500' : 'border-red-500'}
       `}>
         {/* Botão de fechar */}
         <button 
@@ -50,7 +50,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
           {/* Ícone animado */}
           <div className={`
             flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center
-            ${status === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}
+            ${status === 'success' ? 'bg-green-100 text-emerald-600' : 'bg-red-100 text-rose-600'}
           `}>
             {status === 'success' ? (
               <Check className="animate-bounce" size={32} />
@@ -85,8 +85,8 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
             className={`
               w-full py-2 px-4 rounded-lg font-medium text-black 
               ${status === 'success' 
-                ? 'bg-emerald-600 hover:bg-emerald-700' 
-                : 'bg-rose-600 hover:bg-rose-700'}
+                ? 'bg-green-600 hover:bg-emerald-700' 
+                : 'bg-red-600 hover:bg-rose-700'}
               transition-colors
             `}
           >
@@ -100,52 +100,3 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
 
 // Exportar o componente de modal para uso em outros arquivos
 export { NotificationModal };
-
-// Demonstração de como usar o componente
-export default function ModalDemo() {
-  const [showModal, setShowModal] = useState(false);
-  const [status, setStatus] = useState<"success" | "error" | null>('success');
-  
-  const handleShowSuccess = () => {
-    setStatus('success');
-    setShowModal(true);
-  };
-  
-  const handleShowError = () => {
-    setStatus('error');
-    setShowModal(true);
-  };
-  
-  const handleClose = () => {
-    setShowModal(false);
-  };
-  
-  return (
-    <div className="flex flex-col items-center justify-center gap-4">
-      <div className="flex gap-4">
-        <button 
-          onClick={handleShowSuccess}
-          className="px-4 py-2 bg-emerald-600 text-black rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          Mostrar Sucesso
-        </button>
-        
-        <button 
-          onClick={handleShowError}
-          className="px-4 py-2 bg-rose-600 text-black rounded-lg hover:bg-rose-700 transition-colors"
-        >
-          Mostrar Erro
-        </button>
-      </div>
-      
-      <NotificationModal 
-        isOpen={showModal} 
-        onClose={handleClose} 
-        status={status} 
-        message={status === 'success' 
-          ? "Seu email foi enviado com sucesso! Entraremos em contato em breve." 
-          : "Ocorreu um erro ao enviar seu email. Por favor, tente novamente mais tarde."}
-      />
-    </div>
-  );
-}

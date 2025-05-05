@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "./useAuth";
 import { useRouter } from "next/navigation";
 import { Bar } from "react-chartjs-2";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -45,7 +47,15 @@ export default function Dashboard() {
 
   // Estados da análise
   const [data, setData] = useState<ChartData<"bar", number[], string>>({
-    labels: ["Felicidade", "Tristeza", "Raiva", "Estresse", "Nojo", "Surpresa", "Neutro"],
+    labels: [
+      "Felicidade",
+      "Tristeza",
+      "Raiva",
+      "Estresse",
+      "Nojo",
+      "Surpresa",
+      "Neutro",
+    ],
     datasets: [
       {
         label: "Emoções Detectadas",
@@ -85,7 +95,7 @@ export default function Dashboard() {
     fear: "Estresse",
     disgust: "Nojo",
     surprise: "Surpresa",
-    neutral: "Neutro"
+    neutral: "Neutro",
   };
 
   // Inicializar câmera
@@ -105,7 +115,7 @@ export default function Dashboard() {
   // Parar câmera
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (videoRef.current) {
@@ -121,6 +131,7 @@ export default function Dashboard() {
     if (isLogged) {
       initCamera();
     }
+  
     const checkServerStatus = async () => {
       try {
         const response = await fetch("http://localhost:8000/health");
@@ -132,81 +143,206 @@ export default function Dashboard() {
         setErrorMessage("Servidor indisponível. Verifique a conexão.");
       }
     };
-
+  
     checkServerStatus();
+  
     return () => {
       stopCamera();
       if (ws) {
         ws.close();
       }
     };
-  }, [isLogged, ws]);
-
+  }, [isLogged]);
+  
+  // Efeito separado para o WebSocket
+  useEffect(() => {
+    let websocket: WebSocket | null = null;
+    let animationId: number | null = null;
+    let lastAnalysisTime = 0;
+    const ANALYSIS_INTERVAL = 300; // 300ms entre análises (~3 FPS)
+  
+    if (!isLogged || mode !== "continuous" || !isAnalyzing) return;
+  
+    websocket = new WebSocket("ws://localhost:8000/ws/analyze");
+    setWs(websocket);
+  
+    const processMessage = (data: any) => {
+      const emotionOrder = [
+        "happy",
+        "sad",
+        "angry", 
+        "fear",
+        "disgust",
+        "surprise",
+        "neutral"
+      ];
+  
+      const newData = emotionOrder.map(emotion => {
+        const value = data.emotions[emotion] || 0;
+        return Math.round(value * 100) / 100;
+      });
+  
+      setData(prev => ({
+        ...prev,
+        datasets: [{
+          ...prev.datasets[0],
+          data: newData
+        }]
+      }));
+  
+      setDominantEmotion(emotionMap[data.dominant_emotion] || "Nenhuma");
+      setTotalAnalyzed(prev => prev + 1);
+    };
+  
+    const sendFrame = (timestamp: number) => {
+      if (!isAnalyzing || !websocket || websocket.readyState !== WebSocket.OPEN) {
+        if (animationId) cancelAnimationFrame(animationId);
+        return;
+      }
+  
+      if (timestamp - lastAnalysisTime >= ANALYSIS_INTERVAL) {
+        if (videoRef.current && canvasRef.current) {
+          const canvas = canvasRef.current;
+          const context = canvas.getContext('2d');
+          if (!context) return;
+  
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+  
+          canvas.toBlob(blob => {
+            if (blob && websocket && websocket.readyState === WebSocket.OPEN) {
+              try {
+                websocket.send(blob);
+                lastAnalysisTime = timestamp;
+              } catch (error) {
+                console.error("Erro ao enviar frame:", error);
+                setIsAnalyzing(false);
+              }
+            }
+          }, 'image/jpeg', 0.7);
+        }
+      }
+  
+      animationId = requestAnimationFrame(sendFrame);
+    };
+  
+    websocket.onopen = () => {
+      console.log("WebSocket conectado");
+      animationId = requestAnimationFrame(sendFrame);
+    };
+  
+    websocket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'analysis_result') {
+        processMessage(message.data);
+      }
+      else if (message.type === "ping") {
+        // Responde ao ping do servidor
+        if (websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({ type: "pong" }));
+        }
+      }
+    };
+  
+    websocket.onerror = (error) => {
+      console.error("Erro no WebSocket:", error);
+      setIsAnalyzing(false);
+    };
+  
+    websocket.onclose = () => {
+      console.log("WebSocket fechado");
+      setIsAnalyzing(false);
+    };
+  
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (websocket) {
+        websocket.close();
+      }
+    };
+  }, [isLogged, mode, isAnalyzing]);
   // Atualizar gráfico
   const updateChartData = (emotionData: Record<string, number>) => {
-    const labels = ["Felicidade", "Tristeza", "Raiva", "Estresse", "Nojo", "Surpresa", "Neutro"];
-    
-    const values = labels.map(label => {
-      const key = Object.keys(emotionMap).find(k => emotionMap[k] === label);
+    const labels = [
+      "Felicidade",
+      "Tristeza",
+      "Raiva",
+      "Estresse",
+      "Nojo",
+      "Surpresa",
+      "Neutro",
+    ];
+
+    const values = labels.map((label) => {
+      const key = Object.keys(emotionMap).find((k) => emotionMap[k] === label);
       return key ? emotionData[key] || 0 : 0;
     });
 
-    setData(prevData => ({
+    setData((prevData) => ({
       labels,
-      datasets: [{
-        ...prevData.datasets[0],
-        data: values
-      }]
+      datasets: [
+        {
+          ...prevData.datasets[0],
+          data: values,
+        },
+      ],
     }));
   };
 
   const analyzeSingleImage = async () => {
     if (!videoRef.current || !canvasRef.current) return;
-    
+
     setIsLoading(true);
     setErrorMessage("");
-    
+
     try {
       const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      
+      const context = canvas.getContext("2d");
+
       if (!context) return;
-      
+
       // Capturar frame do vídeo
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
       context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      
+
       // Obter URL da imagem para exibição
-      const imageUrl = canvas.toDataURL('image/jpeg');
+      const imageUrl = canvas.toDataURL("image/jpeg");
       setLastImageUrl(imageUrl);
-      
+
       // Enviar para análise
       const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error("Falha ao criar blob da imagem"));
-        }, 'image/jpeg', 0.95);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Falha ao criar blob da imagem"));
+          },
+          "image/jpeg",
+          0.95
+        );
       });
-      
+
       const formData = new FormData();
-      formData.append('file', blob, 'capture.jpg');
-      
-      const response = await fetch('http://localhost:8000/analyze/image', {
-        method: 'POST',
-        body: formData
+      formData.append("file", blob, "capture.jpg");
+
+      const response = await fetch("http://localhost:8000/analyze/image", {
+        method: "POST",
+        body: formData,
       });
-      
+
       if (!response.ok) {
-        throw new Error('Erro na análise da imagem');
+        throw new Error("Erro na análise da imagem");
       }
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         updateChartData(result.result.emotions);
-        setDominantEmotion(emotionMap[result.result.dominant_emotion] || "Nenhuma");
-        setTotalAnalyzed(prev => prev + 1);
+        setDominantEmotion(
+          emotionMap[result.result.dominant_emotion] || "Nenhuma"
+        );
+        setTotalAnalyzed((prev) => prev + 1);
       }
     } catch (err) {
       console.error("Erro na análise:", err);
@@ -218,73 +354,119 @@ export default function Dashboard() {
 
   const startContinuousAnalysis = async () => {
     if (!isLogged) return;
-    
+  
     setIsAnalyzing(true);
     setErrorMessage("");
     setTotalAnalyzed(0);
-    
-    // Conectar ao WebSocket
-    const websocket = new WebSocket('ws://localhost:8000/ws/analyze');
+    setData({
+      labels: ["Felicidade", "Tristeza", "Raiva", "Estresse", "Nojo", "Surpresa", "Neutro"],
+      datasets: [{
+        label: "Emoções Detectadas",
+        data: [0, 0, 0, 0, 0, 0, 0],
+        backgroundColor: [
+          "rgba(34, 197, 94, 0.85)",
+          "rgba(239, 68, 68, 0.85)",
+          "rgba(59, 130, 246, 0.85)",
+          "rgba(168, 85, 247, 0.85)",
+          "rgba(14, 165, 233, 0.85)",
+          "rgba(234, 179, 8, 0.85)",
+          "rgba(107, 114, 128, 0.85)"
+        ]
+      }]
+    });
+  
+    const websocket = new WebSocket("ws://localhost:8000/ws/analyze");
     setWs(websocket);
-    
+  
+    // Controle de taxa de envio (3 FPS)
+    const FPS = 3;
+    const interval = 1000 / FPS;
+    let lastSendTime = 0;
+  
+    const sendFrame = (timestamp: number) => {
+      if (!isAnalyzing || websocket.readyState !== WebSocket.OPEN) {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+        return;
+      }
+  
+      if (timestamp - lastSendTime >= interval) {
+        if (videoRef.current && canvasRef.current) {
+          const canvas = canvasRef.current;
+          const context = canvas.getContext("2d");
+          if (!context) return;
+  
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+  
+          // Usar Blob para melhor performance
+          canvas.toBlob(blob => {
+            if (blob && websocket.readyState === WebSocket.OPEN) {
+              try {
+                websocket.send(blob);
+                lastSendTime = timestamp;
+                setLastImageUrl(canvas.toDataURL("image/jpeg"));
+              } catch (error) {
+                console.error("Erro ao enviar frame:", error);
+                stopContinuousAnalysis();
+              }
+            }
+          }, "image/jpeg", 0.7);
+        }
+      }
+  
+      animationRef.current = requestAnimationFrame(sendFrame);
+    };
+  
     websocket.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      
-      if (message.type === 'analysis_result') {
-        updateChartData(message.data.emotions);
+      if (message.type === "analysis_result") {
+        const emotionOrder = ["happy", "sad", "angry", "fear", "disgust", "surprise", "neutral"];
+        const newData = emotionOrder.map(emotion => message.data.emotions[emotion] || 0);
+        
+        setData(prev => ({
+          ...prev,
+          datasets: [{
+            ...prev.datasets[0],
+            data: newData
+          }]
+        }));
+  
         setDominantEmotion(emotionMap[message.data.dominant_emotion] || "Nenhuma");
         setTotalAnalyzed(prev => prev + 1);
       }
     };
-    
+  
     websocket.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      console.error("Erro no WebSocket:", error);
       setErrorMessage("Erro na conexão com o servidor");
       stopContinuousAnalysis();
     };
-    
+  
     websocket.onclose = () => {
       if (isAnalyzing) {
         setErrorMessage("Conexão com o servidor foi fechada");
       }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       setIsAnalyzing(false);
     };
-
-    // Iniciar captura de frames
-    const sendFrame = () => {
-      if (!isAnalyzing || !videoRef.current || !canvasRef.current || websocket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      
-      if (!context) return;
-      
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      
-      // Obter URL da última imagem para exibição
-      const imageUrl = canvas.toDataURL('image/jpeg');
-      setLastImageUrl(imageUrl);
-      
-      // Enviar frame via WebSocket
-      websocket.send(canvas.toDataURL('image/jpeg', 0.7));
-      
-      animationRef.current = requestAnimationFrame(sendFrame);
-    };
-    
+  
     animationRef.current = requestAnimationFrame(sendFrame);
   };
-
-  // Parar análise contínua
+  
   const stopContinuousAnalysis = () => {
     setIsAnalyzing(false);
+    
     if (ws) {
-      ws.close();
+      // Fecha a conexão com código normal (1000)
+      ws.close(1000, "Encerramento solicitado pelo usuário");
       setWs(null);
     }
+    
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -292,23 +474,39 @@ export default function Dashboard() {
   };
 
   // Exportar dados
-  const exportData = () => {
-    if (!data.labels || !data.datasets[0].data) return;
-    
-    const csvContent = [
-      "Emoção,Contagem",
-      ...data.labels.map((label, index) => `${label},${data.datasets[0].data[index]}`)
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "analise_emocoes.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const exportToPDF = () => {
+    if (!data?.labels || !data?.datasets?.[0]?.data) return;
+  
+    const doc = new jsPDF();
+    const now = new Date().toLocaleString("pt-BR");
+  
+    // Título
+    doc.setFontSize(16);
+    doc.text("Relatório de Análise de Emoções", 14, 20);
+  
+    // Data
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${now}`, 14, 28);
+  
+    // Construir tabela
+    const tableBody = data.labels.map((label, index) => [
+      label,
+      data.datasets[0].data[index],
+    ]);
+  
+    autoTable(doc, {
+      head: [["Tipo de Emoção", "Quantidade Detectada"]],
+      body: tableBody,
+      startY: 35,
+      theme: "grid",
+      headStyles: { fillColor: [41, 128, 185] },
+      styles: { fontSize: 10 },
+      foot: [["Total", data.datasets[0].data.reduce((a, b) => a + b, 0)]],
+      footStyles: { fillColor: [230, 230, 230] },
+    });
+  
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    doc.save(`analise_emocoes_${timestamp}.pdf`);
   };
 
   const handleLogout = () => {
@@ -594,7 +792,7 @@ export default function Dashboard() {
                         Exportação
                       </h3>
                       <button
-                        onClick={exportData}
+                        onClick={exportToPDF}
                         disabled={!data.labels || data.labels.length === 0}
                         className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
                           !data.labels || data.labels.length === 0
@@ -611,7 +809,9 @@ export default function Dashboard() {
                         Relatório Individual
                       </h3>
                       <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
-                        O usuário efetuará um relatório individual com base na análise das emoções efetuada em tempo real e encaminhará para uma autoridade.
+                        O usuário efetuará um relatório individual com base na
+                        análise das emoções efetuada em tempo real e encaminhará
+                        para uma autoridade.
                       </span>
                       <a href="/report">
                         <button
@@ -749,54 +949,59 @@ export default function Dashboard() {
                             )}
                           </button>
                           <button
-                              disabled
-                              className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
-                                !isAnalyzing || isLoading
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-red-600 hover:bg-red-700 text-white"
-                              }`}
-                            >
-                              <Square className="mr-2" size={18} />
-                              Parar
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <h3 className="text-gray-700 font-medium mb-3">
-                          Exportação
-                        </h3>
-                        <button
-                          disabled
-                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
-                        >
-                          <Download className="mr-2" size={18} />
-                          Exportar CSV
-                        </button>
-                      </div>
-                      <div>
-                        <h3 className="text-gray-700 font-medium">
-                          Relatório Individual
-                        </h3>
-                        <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
-                          O usuário efetuará um relatório individual com base na análise das emoções efetuada em tempo real e encaminhará para uma autoridade.
-                        </span>
-                        <button
-                          disabled
-                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
-                        >
-                          <NotepadText className="mr-2" size={18} />
-                          Gerar Relatório
-                        </button>
-                      </div>
-                    </>
-                  )}
+                            disabled
+                            className={`px-4 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                              !isAnalyzing || isLoading
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : "bg-red-600 hover:bg-red-700 text-white"
+                            }`}
+                          >
+                            <Square className="mr-2" size={18} />
+                            Parar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-gray-700 font-medium mb-3">
+                        Exportação
+                      </h3>
+                      <button
+                        disabled
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
+                      >
+                        <Download className="mr-2" size={18} />
+                        Exportar CSV
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="text-gray-700 font-medium">
+                        Relatório Individual
+                      </h3>
+                      <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
+                        O usuário efetuará um relatório individual com base na
+                        análise das emoções efetuada em tempo real e encaminhará
+                        para uma autoridade.
+                      </span>
+                      <button
+                        disabled
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
+                      >
+                        <NotepadText className="mr-2" size={18} />
+                        Gerar Relatório
+                      </button>
+                    </div>
+                  </>
+                )}
 
                 {/* Error message */}
                 {errorMessage && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start">
-                    <AlertCircle size={20} className="mr-2 flex-shrink-0 mt-0.5" />
+                    <AlertCircle
+                      size={20}
+                      className="mr-2 flex-shrink-0 mt-0.5"
+                    />
                     <span className="text-sm">{errorMessage}</span>
                   </div>
                 )}
@@ -807,11 +1012,15 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-white p-3 rounded border border-gray-200">
                       <p className="text-xs text-gray-500">Emoção atual</p>
-                      <p className="font-medium text-gray-800">{dominantEmotion}</p>
+                      <p className="font-medium text-gray-800">
+                        {dominantEmotion}
+                      </p>
                     </div>
                     <div className="bg-white p-3 rounded border border-gray-200">
                       <p className="text-xs text-gray-500">Frames analisados</p>
-                      <p className="font-medium text-gray-800">{totalAnalyzed}</p>
+                      <p className="font-medium text-gray-800">
+                        {totalAnalyzed}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -839,8 +1048,13 @@ export default function Dashboard() {
                   ) : (
                     <div className="flex items-center justify-center h-full bg-gray-800">
                       <div className="text-center p-6">
-                        <Camera className="mx-auto text-gray-400 mb-3" size={48} />
-                        <p className="text-gray-300">Faça login para acessar a câmera</p>
+                        <Camera
+                          className="mx-auto text-gray-400 mb-3"
+                          size={48}
+                        />
+                        <p className="text-gray-300">
+                          Faça login para acessar a câmera
+                        </p>
                       </div>
                     </div>
                   )}
@@ -854,7 +1068,9 @@ export default function Dashboard() {
           <div className="lg:col-span-3">
             {/* Breadcrumbs */}
             <nav className="flex items-center text-sm font-medium text-white/60 mb-4">
-              <a href="/" className="hover:text-white">Início</a>
+              <a href="/" className="hover:text-white">
+                Início
+              </a>
               <ChevronRight className="h-4 w-4 mx-2" />
               <span className="text-white">Dashboard</span>
             </nav>
@@ -961,7 +1177,8 @@ export default function Dashboard() {
                   <div className="bg-gray-100 rounded-lg p-8 flex flex-col items-center justify-center">
                     <Camera className="text-gray-400 mb-3" size={48} />
                     <p className="text-gray-500 text-center">
-                      Nenhuma imagem capturada ainda. Inicie uma análise para visualizar.
+                      Nenhuma imagem capturada ainda. Inicie uma análise para
+                      visualizar.
                     </p>
                   </div>
                 )}
@@ -981,23 +1198,46 @@ export default function Dashboard() {
                 EmotionTrack
               </h3>
               <p className="text-gray-400 text-sm">
-                Sistema de análise de emoções faciais em tempo real para monitoramento e avaliação emocional.
+                Sistema de análise de emoções faciais em tempo real para
+                monitoramento e avaliação emocional.
               </p>
             </div>
             <div>
-              <h3 className="text-white text-lg font-bold mb-4">Links Rápidos</h3>
+              <h3 className="text-white text-lg font-bold mb-4">
+                Links Rápidos
+              </h3>
               <ul className="space-y-2">
                 <li>
-                  <a href="/" className="text-gray-400 hover:text-white transition duration-200">Página Inicial</a>
+                  <a
+                    href="/"
+                    className="text-gray-400 hover:text-white transition duration-200"
+                  >
+                    Página Inicial
+                  </a>
                 </li>
                 <li>
-                  <a href="/login" className="text-gray-400 hover:text-white transition duration-200">Login</a>
+                  <a
+                    href="/login"
+                    className="text-gray-400 hover:text-white transition duration-200"
+                  >
+                    Login
+                  </a>
                 </li>
                 <li>
-                  <a href="/register" className="text-gray-400 hover:text-white transition duration-200">Cadastro</a>
+                  <a
+                    href="/register"
+                    className="text-gray-400 hover:text-white transition duration-200"
+                  >
+                    Cadastro
+                  </a>
                 </li>
                 <li>
-                  <a href="/report" className="text-gray-400 hover:text-white transition duration-200">Relatórios</a>
+                  <a
+                    href="/report"
+                    className="text-gray-400 hover:text-white transition duration-200"
+                  >
+                    Relatórios
+                  </a>
                 </li>
               </ul>
             </div>
@@ -1006,14 +1246,20 @@ export default function Dashboard() {
               <p className="text-gray-400 text-sm mb-2">
                 Envie dúvidas ou sugestões para nossa equipe.
               </p>
-              <a href="mailto:contato@emotiontrack.com" className="text-indigo-400 hover:text-indigo-300 transition duration-200">
-                contato@emotiontrack.com
+              <a
+                href="mailto:dsglucass@gmail.com"
+                className="text-indigo-400 hover:text-indigo-300 transition duration-200"
+              >
+                dsglucass@gmail.com
+                <br></br>
+                aaron.msilva56@gmail.com
               </a>
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-6 text-center">
             <p className="text-gray-500 text-sm">
-              &copy; {new Date().getFullYear()} EmotionTrack. Todos os direitos reservados.
+              &copy; {new Date().getFullYear()} EmotionTrack. Todos os direitos
+              reservados.
             </p>
           </div>
         </div>

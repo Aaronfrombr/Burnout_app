@@ -47,7 +47,7 @@ export const login = async (email: string, password: string): Promise<LoginRespo
 
     return {
       success: true,
-      token: data.token, // Adicione isso se seu backend retornar um token
+      token: data.token,
       user: data.user
     };
 

@@ -1,8 +1,13 @@
-from fastapi import FastAPI, HTTPException, Response, status, Request, Query, UploadFile
+import base64
+import uuid
+import cv2
+from deepface import DeepFace
+from fastapi import FastAPI, File, HTTPException, Response, WebSocket, WebSocketDisconnect, status, Request, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
+import numpy as np
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
@@ -12,10 +17,9 @@ import hashlib
 import httpx
 import jwt
 import secrets
+import asyncio
 
 # Carrega variáveis de ambiente
-
-session_cache: Dict[str, Dict[str, Any]] = {}
 
 continuous_analysis_data = {}
 
@@ -26,7 +30,7 @@ app = FastAPI()
 # Configura CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Adicione todos os domínios necessários
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,6 +42,177 @@ NEXT_PUBLIC_GOOGLE_CLIENT_SECRET = os.getenv("NEXT_PUBLIC_GOOGLE_CLIENT_SECRET")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:3000")
 JWT_SECRET = os.getenv("JWT_SECRET", secrets.token_hex(32))
 JWT_ALGORITHM = "HS256"
+
+class EmotionAnalysisResult(BaseModel):
+    emotions: Dict[str, float]
+    dominant_emotion: str
+    face_detected: bool
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def send_json(self, data: dict, websocket: WebSocket):
+        try:
+            await websocket.send_json(data)
+        except Exception as e:
+            print(f"Erro ao enviar mensagem: {e}")
+            self.disconnect(websocket)
+
+manager = ConnectionManager()
+
+# Função para análise de emoções em uma imagem
+async def analyze_emotions(image_data: bytes) -> Dict:
+    await asyncio.sleep(0.1)  # Delay de 100ms
+    try:
+        # Converter bytes para numpy array
+        nparr = np.frombuffer(image_data, np.uint8)
+        
+        # Decodificar a imagem
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return {
+                "emotions": {},
+                "dominant_emotion": "none",
+                "face_detected": False
+            }
+        
+        # Converter BGR para RGB (que o DeepFace espera)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # Analisar emoções - forma correta de chamar o DeepFace
+        result = DeepFace.analyze(
+            img_path=img_rgb, 
+            actions=['emotion'],
+            enforce_detection=False,
+            detector_backend='opencv',
+            silent=True
+        )
+        
+        # Se múltiplos rostos, pegar o primeiro
+        if isinstance(result, list):
+            result = result[0]
+        
+        return {
+            "emotions": result["emotion"],
+            "dominant_emotion": result["dominant_emotion"],
+            "face_detected": True
+        }
+        
+    except Exception as e:
+        print(f"Erro na análise: {str(e)}")
+        return {
+            "emotions": {},
+            "dominant_emotion": "none",
+            "face_detected": False
+        }
+
+@app.post("/analyze/image")
+async def analyze_image(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        result = await analyze_emotions(contents)
+        
+        if not result["face_detected"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum rosto detectado na imagem"
+            )
+        
+        return {
+            "success": True,
+            "result": result
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar imagem: {str(e)}"
+        )
+    
+# Rota WebSocket para análise contínua
+@app.websocket("/ws/analyze")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_bytes(), timeout=10.0)
+                # Receber imagem como blob
+                image_data = await websocket.receive_bytes()
+                
+                # Converter para formato OpenCV
+                nparr = np.frombuffer(image_data, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                if img is None:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Não foi possível decodificar a imagem"
+                    })
+                    continue
+
+                # Analisar emoções
+                try:
+                    results = DeepFace.analyze(
+                        img_path=img,
+                        actions=['emotion'],
+                        enforce_detection=False,
+                        detector_backend='opencv',
+                        silent=True
+                    )
+                    
+                    if isinstance(results, list):
+                        result = results[0]
+                    else:
+                        result = results
+
+                    await websocket.send_json({
+                        "type": "analysis_result",
+                        "data": {
+                            "emotions": result['emotion'],
+                            "dominant_emotion": result['dominant_emotion'],
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    })
+                    
+                except Exception as analysis_error:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Erro na análise: {str(analysis_error)}"
+                    })
+            except asyncio.TimeoutError:
+                # Envia ping para verificar se a conexão está ativa
+                try:
+                    await websocket.send_json({"type": "ping"})
+                    continue
+                except:
+                    break
+
+            except Exception as recv_error:
+                if isinstance(recv_error, WebSocketDisconnect):
+                    print("Cliente desconectado normalmente")
+                else:
+                    print(f"Erro ao receber dados: {str(recv_error)}")
+                break
+
+    except Exception as e:
+        print(f"Erro na conexão WebSocket: {str(e)}")
+    finally:
+        try:
+            await websocket.close(code=1000)
+        except:
+            pass
+        print("Conexão WebSocket finalizada")
 
 class UserLogin(BaseModel):
     email: str
@@ -366,14 +541,12 @@ async def google_callback(request: Request, code: str = Query(...), state: str =
             url=f"{BASE_URL}/login/error?message=Erro inesperado"
         )
     
-# Adicione esta nova rota (coloque junto com as outras rotas de autenticação)
 @app.post("/auth/google")
 async def handle_google_auth(request: Request):
     data = await request.json()
     code = data.get("code")
     state = data.get("state")
     
-    # REAPROVEITE a lógica que já está no google_callback:
     try:
         token_url = "https://oauth2.googleapis.com/token"
         data = {
