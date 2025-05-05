@@ -19,8 +19,13 @@ export default function HomePage() {
     { role: "assistant", content: "Olá! Como posso ajudar você hoje?" },
   ]);
 
-  // Handle scroll effect for navbar
   useEffect(() => {
+    if (window.location.hash) {
+      window.history.replaceState(null, ' ');
+    }
+
+    window.scrollTo(0, 0);
+
     const handleScroll = () => {
       if (window.scrollY > 10) {
         setIsScrolled(true);
@@ -30,7 +35,9 @@ export default function HomePage() {
     };
 
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   // Handle chat submission
