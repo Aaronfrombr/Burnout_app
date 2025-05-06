@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmotionTrackChatbot } from './ChatBot';
+import { EmotionTrackChatbot } from "./ChatBot";
 import {
   MessageSquare,
   BarChart2,
@@ -21,7 +21,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (window.location.hash) {
-      window.history.replaceState(null, ' ');
+      window.history.replaceState(null, " ");
     }
 
     window.scrollTo(0, 0);
@@ -339,24 +339,27 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Call to Action */}
-        <div className="bg-indigo-600 py-16">
-          <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold text-white mb-6">
-              Pronto para entender melhor suas emoções?
-            </h2>
-            <p className="text-indigo-100 max-w-2xl mx-auto mb-8">
-              Registre-se agora para começar a monitorar sua saúde emocional e
-              obter insights valiosos baseados em análise comportamental
-              avançada.
-            </p>
-            <a href="/register">
-              <button className="px-8 py-3 bg-white text-indigo-600 font-medium rounded-lg hover:bg-indigo-50 transition-colors">
-                Criar uma conta
-              </button>
-            </a>
+        {isLogged ? (
+          <div></div>
+        ) : (
+          <div className="bg-indigo-600 py-16">
+            <div className="container mx-auto px-4 text-center">
+              <h2 className="text-3xl font-bold text-white mb-6">
+                Pronto para entender melhor suas emoções?
+              </h2>
+              <p className="text-indigo-100 max-w-2xl mx-auto mb-8">
+                Registre-se agora para começar a monitorar sua saúde emocional e
+                obter insights valiosos baseados em análise comportamental
+                avançada.
+              </p>
+              <a href="/register">
+                <button className="px-8 py-3 bg-white text-indigo-600 font-medium rounded-lg hover:bg-indigo-50 transition-colors">
+                  Criar uma conta
+                </button>
+              </a>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <footer className="bg-gray-800 text-gray-300 py-12">
