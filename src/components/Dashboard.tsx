@@ -227,11 +227,11 @@ export default function Dashboard() {
   ) => {
     // Se já houver um diagnóstico ativo, não fazemos nada
     if (diagnosis?.active) return;
-  
+
     // Atualizar contagem de frames consecutivos
     const updatedCounts = { ...consecutiveFrames };
     const newAlerts: EmotionAlert[] = [];
-  
+
     // Zerar contadores para emoções abaixo do threshold
     Object.keys(updatedCounts).forEach((emotion) => {
       if (emotions[emotion] < 0.3) {
@@ -239,14 +239,14 @@ export default function Dashboard() {
         updatedCounts[emotion] = 0;
       }
     });
-  
+
     // Verificar níveis de alerta para todas as emoções
     Object.entries(emotions).forEach(([emotion, percentage]) => {
       if (percentage >= 0.5) {
         // Limiar mínimo para mostrar alerta
         let level: AlertLevel = "info";
         let message = "";
-  
+
         if (percentage >= 0.8) {
           level = "critical";
           message = `${emotionMap[emotion]} em nível elevado (${Math.round(
@@ -263,7 +263,7 @@ export default function Dashboard() {
             percentage * 100
           )}%)`;
         }
-  
+
         newAlerts.push({
           emotion,
           level,
@@ -273,15 +273,17 @@ export default function Dashboard() {
         });
       }
     });
-  
+
     // Atualizar alertas ativos (mantém apenas os últimos 5 segundos)
     setActiveAlerts((prev) =>
       [
         ...newAlerts,
-        ...prev.filter((a) => new Date().getTime() - a.timestamp.getTime() < 5000),
+        ...prev.filter(
+          (a) => new Date().getTime() - a.timestamp.getTime() < 5000
+        ),
       ].slice(0, 5)
     ); // Limita a 5 alertas
-  
+
     // Mostrar o alerta mais crítico
     if (newAlerts.length > 0) {
       const mostCritical = newAlerts.reduce((prev, current) => {
@@ -292,22 +294,24 @@ export default function Dashboard() {
         if (current.level === "warning") return current;
         return prev;
       }, newAlerts[0]);
-  
+
       setCurrentAlert(mostCritical);
       setShowAlertModal(true);
     }
-  
+
     // Verificar emoções negativas para diagnóstico completo
     for (const emotion of emotionThresholds.negative.emotions) {
       if (emotions[emotion] >= emotionThresholds.negative.threshold) {
         updatedCounts[emotion] += 1;
-  
-        if (updatedCounts[emotion] >= emotionThresholds.negative.consecutiveFrames) {
+
+        if (
+          updatedCounts[emotion] >= emotionThresholds.negative.consecutiveFrames
+        ) {
           const emotionMessages =
             emotionThresholds.negative.messages[
               emotion as keyof typeof emotionThresholds.negative.messages
             ];
-          
+
           setDiagnosis({
             active: true,
             type: "negative",
@@ -316,24 +320,26 @@ export default function Dashboard() {
             message: emotionMessages.message,
             solutions: emotionMessages.solutions,
           });
-  
+
           // Resetar contadores após diagnóstico
           Object.keys(updatedCounts).forEach((e) => (updatedCounts[e] = 0));
           setConsecutiveFrames(updatedCounts);
-          
+
           // Pausar a análise contínua para emoções negativas
           stopContinuousAnalysis();
           return;
         }
       }
     }
-  
+
     // Verificar emoções positivas para diagnóstico completo
     for (const emotion of emotionThresholds.positive.emotions) {
       if (emotions[emotion] >= emotionThresholds.positive.threshold) {
         updatedCounts[emotion] += 1;
-  
-        if (updatedCounts[emotion] >= emotionThresholds.positive.consecutiveFrames) {
+
+        if (
+          updatedCounts[emotion] >= emotionThresholds.positive.consecutiveFrames
+        ) {
           const emotionMessages =
             emotionThresholds.positive.messages[
               emotion as keyof typeof emotionThresholds.positive.messages
@@ -342,7 +348,7 @@ export default function Dashboard() {
             emotionMessages.compliments[
               Math.floor(Math.random() * emotionMessages.compliments.length)
             ];
-  
+
           setDiagnosis({
             active: true,
             type: "positive",
@@ -351,13 +357,13 @@ export default function Dashboard() {
             message: emotionMessages.message,
             compliment: randomCompliment,
           });
-  
+
           // Resetar apenas o contador desta emoção
           updatedCounts[emotion] = 0;
         }
       }
     }
-  
+
     setConsecutiveFrames(updatedCounts);
   };
 
@@ -1061,32 +1067,40 @@ export default function Dashboard() {
 
   const AlertHistory = () => {
     const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
-  
-    if (activeAlerts.length === 0) return (
-      <div className="text-center py-4 text-gray-500">
-        Nenhum alerta recente
-      </div>
-    );
-  
+
+    if (activeAlerts.length === 0)
+      return (
+        <div className="text-center py-4 text-gray-500">
+          Nenhum alerta recente
+        </div>
+      );
+
     return (
       <>
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {activeAlerts.map((alert, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`p-3 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition ${
-                alert.level === 'critical' ? 'bg-red-50 border-red-500 hover:bg-red-100' : 
-                alert.level === 'warning' ? 'bg-yellow-50 border-yellow-500 hover:bg-yellow-100' : 
-                'bg-blue-50 border-blue-500 hover:bg-blue-100'
+                alert.level === "critical"
+                  ? "bg-red-50 border-red-500 hover:bg-red-100"
+                  : alert.level === "warning"
+                  ? "bg-yellow-50 border-yellow-500 hover:bg-yellow-100"
+                  : "bg-blue-50 border-blue-500 hover:bg-blue-100"
               }`}
               onClick={() => setSelectedEmotion(alert.emotion)}
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <p className={`font-medium ${
-                    alert.level === 'critical' ? 'text-red-700' : 
-                    alert.level === 'warning' ? 'text-yellow-700' : 'text-blue-700'
-                  }`}>
+                  <p
+                    className={`font-medium ${
+                      alert.level === "critical"
+                        ? "text-red-700"
+                        : alert.level === "warning"
+                        ? "text-yellow-700"
+                        : "text-blue-700"
+                    }`}
+                  >
                     {alert.message}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -1094,17 +1108,20 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <span className="text-lg">
-                  {alert.level === 'critical' ? '❗' : 
-                   alert.level === 'warning' ? '⚠️' : 'ℹ️'}
+                  {alert.level === "critical"
+                    ? "❗"
+                    : alert.level === "warning"
+                    ? "⚠️"
+                    : "ℹ️"}
                 </span>
               </div>
             </div>
           ))}
         </div>
-        
-        <EmotionDetailsModal 
-          emotion={selectedEmotion} 
-          onClose={() => setSelectedEmotion(null)} 
+
+        <EmotionDetailsModal
+          emotion={selectedEmotion}
+          onClose={() => setSelectedEmotion(null)}
         />
       </>
     );
@@ -1149,18 +1166,19 @@ export default function Dashboard() {
         rel="stylesheet"
       ></link>
       {/* Header */}
+
       <header className="bg-gradient-to-r from-indigo-600 to-blue-600 shadow-xl relative z-10 transition-all duration-300 hover:brightness-105">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-center justify-between">
             {/* Logo e título */}
-            <div className="flex items-center space-x-3 group cursor-pointer">
-              <h1 className="flex items-center text-2xl font-bold text-white transition-all duration-300 group-hover:tracking-wider">
-                <Brain className="text-white h-8 w-8 mr-2 animate-pulse group-hover:scale-110 transition-transform duration-300" />
+            <div className="flex items-center space-x-3 group cursor-pointer mb-4 sm:mb-0">
+              <h1 className="flex items-center text-xl sm:text-2xl font-bold text-white transition-all duration-300 group-hover:tracking-wider">
+                <Brain className="text-white h-6 w-6 sm:h-8 sm:w-8 mr-2 animate-pulse group-hover:scale-110 transition-transform duration-300" />
                 <span>EmotionTrack</span>
               </h1>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
               <a
                 href="/"
                 className="p-2 rounded-full hover:bg-black transition duration-200"
@@ -1185,29 +1203,29 @@ export default function Dashboard() {
               </div>
 
               {isLogged ? (
-                <div className="flex items-center space-x-3">
-                  <div className="text-white/90 text-sm font-medium leading-tight">
+                <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-2 sm:mt-0">
+                  <div className="text-white/90 text-sm font-medium leading-tight text-center sm:text-left">
                     <p className="text-xs text-white/70">Logado como:</p>
                     <p className="font-semibold">{userName || "Usuário"}</p>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-black transition-all duration-200 backdrop-blur-md shadow-sm"
+                    className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-black transition-all duration-200 backdrop-blur-md shadow-sm w-full sm:w-auto"
                   >
                     Sair
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto mt-2 sm:mt-0">
                   <a
                     href="/"
-                    className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-white/30 transition duration-200 backdrop-blur-md shadow-sm"
+                    className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-white/30 transition duration-200 backdrop-blur-md shadow-sm w-full sm:w-auto text-center"
                   >
                     Entrar
                   </a>
                   <a
                     href="/register"
-                    className="px-4 py-2 rounded-md bg-white text-indigo-600 hover:bg-gray-100 transition duration-200 shadow-sm"
+                    className="px-4 py-2 rounded-md bg-white text-indigo-600 hover:bg-gray-100 transition duration-200 shadow-sm w-full sm:w-auto text-center"
                   >
                     Cadastrar
                   </a>

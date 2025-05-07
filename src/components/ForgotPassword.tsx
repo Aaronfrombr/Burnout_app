@@ -19,7 +19,7 @@ const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
     >
       <div
         className={`relative w-full max-w-md rounded-2xl p-8 shadow-xl ${
-          type === "success" ? "bg-emerald-50" : "bg-rose-50"
+          type === "success" ? "bg-green-50" : "bg-red-50"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -30,7 +30,7 @@ const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
           <X
             size={20}
             className={
-              type === "success" ? "text-emerald-600" : "text-rose-600"
+              type === "success" ? "text-green-600" : "text-red-600"
             }
           />
         </button>
@@ -60,8 +60,8 @@ const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
         <button
           className={`mt-6 w-full rounded-lg py-3 font-medium ${
             type === "success"
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-              : "bg-rose-600 hover:bg-rose-700 text-white"
+              ? "bg-green-600 hover:bg-green-700 text-white"
+              : "bg-red-600 hover:bg-red-700 text-white"
           }`}
           onClick={onClose}
         >

@@ -82,7 +82,7 @@ export default function HomePage() {
         <link rel="icon" href="/image/logo.png" />
       </Head>
 
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 sm:p-4 md:p-6 lg:p-8">
         <link
           href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
           rel="stylesheet"
