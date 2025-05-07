@@ -887,22 +887,28 @@ export default function Dashboard() {
     }
   };
 
-  // Exportar dados
   const exportToPDF = () => {
     if (!data?.labels || !data?.datasets?.[0]?.data) return;
 
     const doc = new jsPDF();
     const now = new Date().toLocaleString("pt-BR");
 
-    // Título
     doc.setFontSize(16);
     doc.text("Relatório de Análise de Emoções", 14, 20);
 
-    // Data
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${now}`, 14, 28);
+    doc.setFontSize(12);
+    doc.setTextColor(0, 51, 102); 
+    doc.text("Informações do Relatório:", 14, 28);
 
-    // Construir tabela
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0); 
+    doc.text(`Gerado em: ${now}`, 20, 34);
+    doc.text(
+      `Solicitado por: ${userName || "Usuário não identificado"}`,
+      20,
+      40
+    );
+
     const tableBody = data.labels.map((label, index) => [
       label,
       data.datasets[0].data[index],
@@ -911,7 +917,7 @@ export default function Dashboard() {
     autoTable(doc, {
       head: [["Tipo de Emoção", "Quantidade Detectada"]],
       body: tableBody,
-      startY: 35,
+      startY: 46,
       theme: "grid",
       headStyles: { fillColor: [41, 128, 185] },
       styles: { fontSize: 10 },
@@ -919,8 +925,20 @@ export default function Dashboard() {
       footStyles: { fillColor: [230, 230, 230] },
     });
 
+    const pageCount = doc.internal.pages.length - 1;
+    doc.setPage(pageCount);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    const text = `Documento gerado pelo sistema para ${
+      userName || "usuário"
+    } | ${now}`;
+    const pageSize = doc.internal.pageSize;
+    const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+    doc.text(text, pageWidth / 2, 285, { align: "center" });
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    doc.save(`analise_emocoes_${timestamp}.pdf`);
+    const safeUserName = userName ? userName.replace(/[^\w]/g, "_") : "usuario";
+    doc.save(`analise_emocoes_${safeUserName}_${timestamp}.pdf`);
   };
 
   const handleLogout = () => {
@@ -1368,7 +1386,7 @@ export default function Dashboard() {
                         }`}
                       >
                         <Download className="mr-2" size={18} />
-                        Exportar CSV
+                        Exportar PDF
                       </button>
                     </div>
                     <div>
