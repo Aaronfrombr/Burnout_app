@@ -1,7 +1,8 @@
 import { useState, FormEvent, useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useRouter } from "next/router";
 import Head from "next/head";
+import axios from "axios";
 import {
   Lock,
   Eye,
@@ -11,6 +12,7 @@ import {
   X,
   ArrowLeft,
 } from "lucide-react";
+import emailjs from "@emailjs/browser";
 
 type ModalType = "success" | "error" | null;
 
@@ -80,11 +82,25 @@ const FeedbackModal = ({ type, message, onClose }: ModalProps) => {
   );
 };
 
+interface FormData {
+  email: string;
+  current_password: string;
+  password: string;
+  confirmPassword: string;
+}
+
 export default function ResetPassword() {
   const router = useRouter();
-  const { token } = router.query;
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token') || '';
+  const emailParam = searchParams.get('email') || '';
+  const decodedEmail = emailParam ? decodeURIComponent(emailParam) : '';
+  const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
+    email: "",
+    current_password: "",
     password: "",
     confirmPassword: "",
   });
@@ -93,40 +109,48 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
 
   const [modalType, setModalType] = useState<ModalType>(null);
   const [modalMessage, setModalMessage] = useState("");
 
+  // Inicializa o EmailJS no lado do cliente
   useEffect(() => {
-    if (token) {
-      const validateToken = async () => {
-        try {
-          console.log("Validando token:", token);
-          await new Promise((resolve) => setTimeout(resolve, 800));
-
-          if (typeof token === "string" && token.length > 10) {
-            setIsTokenValid(true);
-          } else {
-            setIsTokenValid(false);
-            setErrors({
-              token:
-                "Link de redefinição inválido ou expirado. Solicite um novo link.",
-            });
-          }
-        } catch (error) {
-          console.error("Erro ao validar token:", error);
-          setIsTokenValid(false);
-          setErrors({
-            token:
-              "Não foi possível validar seu link de redefinição. Tente novamente mais tarde.",
-          });
-        }
-      };
-
-      validateToken();
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY) {
+      emailjs.init(process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY);
     }
-  }, [token]);
+  }, []);
+
+  useEffect(() => {
+    
+    const validateToken = async () => {
+      try {
+        const response = await axios.post('http://localhost:8000/validate-reset-token/', { 
+          token,
+          email: decodedEmail,  // Envie ambos token e email
+          new_password: formData.password
+        });
+        
+        if (response.data.valid) {
+          setIsTokenValid(true);
+          setFormData(prev => ({ ...prev, email: decodedEmail }));
+        } else {
+          setIsTokenValid(false);
+          setErrors({ token: response.data.message });
+        }
+      } catch (error) {
+        console.error("Erro na validação:", error);
+        setIsTokenValid(false);
+        setErrors({ token: "Erro ao validar token" });
+      }
+    };
+
+    if (token && emailParam) {
+      validateToken();
+    } else {
+      setIsTokenValid(false);
+      setErrors({ token: "Link incompleto" });
+    }
+}, [token, decodedEmail]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -162,44 +186,45 @@ export default function ResetPassword() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (validateForm()) {
-      setIsSubmitting(true);
-
-      try {
-        console.log("Dados do formulário:", { ...formData, token });
-        // Simulação de envio para o backend
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        // Sucesso (aqui seria a integração com o backend)
-        setModalType("success");
-        setModalMessage(
-          "Sua senha foi atualizada com sucesso! Agora você pode fazer login com sua nova senha."
-        );
-
-        setFormData({
-          password: "",
-          confirmPassword: "",
-        });
-      } catch (error) {
-        console.error("Erro ao redefinir senha:", error);
-        setModalType("error");
-        setModalMessage(
-          "Ocorreu um erro ao atualizar sua senha. Por favor, tente novamente."
-        );
-      } finally {
-        setIsSubmitting(false);
+    
+    if (!validateForm()) return;
+  
+    setIsSubmitting(true);
+  
+    try {
+      // Verificação adicional dos dados
+      if (!token || !emailParam || !formData.password) {
+        throw new Error("Dados incompletos para processar a requisição");
       }
+  
+      const response = await axios.post('http://localhost:8000/reset-password/', {
+        token,
+        email: decodedEmail, // Usa o email da URL
+        new_password: formData.password
+      });
+  
+      setModalType("success");
+      setModalMessage("Senha alterada com sucesso! Você será redirecionado para o login.");
+      
+    } catch (error: any) {
+      console.error("Erro ao resetar senha:", error);
+      setModalType("error");
+      setModalMessage(
+        error.response?.data?.detail || 
+        error.message ||
+        "Erro ao alterar senha. Por favor, tente novamente."
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
+  
   const closeModal = () => {
     setModalType(null);
     setModalMessage("");
 
-    // Se o modal era de sucesso, redirecionar para login
     if (modalType === "success") {
       router.push("/login");
     }
@@ -254,50 +279,6 @@ export default function ResetPassword() {
     );
   };
 
-  if (isTokenValid === false) {
-    return (
-      <>
-        <Head>
-          <title>EmotionTrack | Link Inválido</title>
-          <link rel="icon" href="/image/logo.png" />
-        </Head>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="p-8 text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
-                <AlertCircle size={40} className="text-red-500" />
-              </div>
-
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                Link inválido
-              </h1>
-
-              <p className="text-gray-600 mb-6">
-                {errors.token ||
-                  "Seu link de redefinição é inválido ou expirou"}
-              </p>
-
-              <Link
-                href="/forgot-password"
-                className="inline-block w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-xl shadow-md hover:from-blue-700 hover:to-indigo-800 transition-all duration-300"
-              >
-                Solicitar um novo link
-              </Link>
-
-              <Link
-                href="/login"
-                className="mt-4 inline-flex items-center justify-center text-gray-600 hover:text-blue-600 transition-all duration-300"
-              >
-                <ArrowLeft size={16} className="mr-1" />
-                Voltar para o login
-              </Link>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Head>
@@ -305,9 +286,9 @@ export default function ResetPassword() {
         <link rel="icon" href="/image/logo.png" />
       </Head>
       <link
-        href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
-        rel="stylesheet"
-      ></link>
+          href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+          rel="stylesheet"
+        ></link>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Header Section */}
@@ -325,19 +306,19 @@ export default function ResetPassword() {
             </div>
           </div>
 
+          
+
           {/* Form Section */}
           <div className="p-8">
             <div className="mb-2">
-              <a href="/">
+              <Link href="/">
                 <button
                   type="button"
                   className="px-5 py-1 border border-gray-300 text-gray-700 rounded-lg bg-blue-400 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all flex-1"
                 >
-                  <span>
-                    <ArrowLeft />
-                  </span>
+                  <ArrowLeft />
                 </button>
-              </a>
+              </Link>
               <h2 className="text-xl font-semibold text-gray-800 mb-1 mt-3">
                 Criar nova senha
               </h2>

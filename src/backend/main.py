@@ -48,6 +48,25 @@ class EmotionAnalysisResult(BaseModel):
     dominant_emotion: str
     face_detected: bool
 
+class PasswordChangeRequest(BaseModel):
+    email: EmailStr
+    current_password: str
+    new_password: str
+    confirm_new_password: str
+
+    @validator('new_password')
+    def new_password_length(cls, v):
+        if len(v) < 6:
+            raise ValueError("A nova senha deve ter pelo menos 6 caracteres")
+        return v
+
+    @validator('confirm_new_password')
+    def passwords_match(cls, v, values):
+        if 'new_password' in values and v != values['new_password']:
+            raise ValueError("As novas senhas não coincidem")
+        return v
+
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
@@ -440,6 +459,150 @@ async def register_user(user: UserCreate):
     finally:
         if conn is not None:
             conn.close()
+
+@app.post("/generate-reset-token/")
+async def generate_reset_token(request: dict):
+    token = secrets.token_urlsafe(32)  # Certifique-se que está gerando um token válido
+    expires_at = datetime.now() + timedelta(hours=1)  # Verifique o horário do servidor
+    conn = None
+    try:
+        email = request.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Email é obrigatório")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Verifica se o usuário existe
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Email não cadastrado")
+
+        # Remove tokens existentes para este usuário
+        cur.execute(
+            "DELETE FROM password_reset_tokens WHERE user_id = %s",
+            (user['id'],)
+        )
+
+        # Gera novo token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(hours=1)
+
+        # Armazena no banco
+        cur.execute(
+            """
+            INSERT INTO password_reset_tokens (token, user_id, email, expires_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (token, user['id'], email, expires_at)
+        )
+        conn.commit()
+
+        return {"token": token, "expires_at": expires_at.isoformat()}
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/validate-reset-token/")
+async def validate_reset_token(request: dict):
+    conn = None
+    try:
+        token = request.get("token")
+        email = request.get("email")
+        
+        if not token or not email:
+            return {"valid": False, "message": "Token e email são obrigatórios"}
+            
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Verifique se o token existe e está associado ao email
+        cur.execute(
+            """
+            SELECT prt.user_id, prt.email, prt.expires_at, u.email as user_email
+            FROM password_reset_tokens prt
+            JOIN users u ON prt.user_id = u.id
+            WHERE prt.token = %s AND prt.email = %s AND u.email = %s
+            """, 
+            (token, email, email)
+        )
+        result = cur.fetchone()
+        
+        if not result:
+            return {"valid": False, "message": "Token inválido ou não associado ao email"}
+            
+        if datetime.now() > result['expires_at']:
+            return {"valid": False, "message": "Token expirado"}
+        
+        return {"valid": True, "email": result['email']}
+        
+    except Exception as e:
+        print(f"Erro ao validar token: {str(e)}")
+        return {"valid": False, "message": "Erro interno ao validar token"}
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/reset-password/")
+async def reset_password(request: dict):
+    conn = None
+    try:
+        token = request.get("token")
+        email = request.get("email")
+        new_password = request.get("new_password")
+
+        if not all([token, email, new_password]):
+            raise HTTPException(status_code=400, detail="Todos os campos são obrigatórios")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Verifica se o token é válido
+        cur.execute(
+            """SELECT user_id, expires_at FROM password_reset_tokens 
+               WHERE token = %s AND email = %s""",
+            (token, email)
+        )
+        token_data = cur.fetchone()
+
+        if not token_data:
+            raise HTTPException(status_code=404, detail="Token inválido")
+
+        if datetime.now() > token_data['expires_at']:
+            raise HTTPException(status_code=400, detail="Token expirado")
+
+        # Atualiza a senha do usuário
+        hashed_password = hash_password(new_password)
+        cur.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (hashed_password, token_data['user_id'])
+        )
+
+        # Remove o token usado
+        cur.execute(
+            "DELETE FROM password_reset_tokens WHERE token = %s",
+            (token,)
+        )
+
+        conn.commit()
+
+        return {"message": "Senha atualizada com sucesso"}
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
 
 @app.get("/auth/google")
 async def login_google():

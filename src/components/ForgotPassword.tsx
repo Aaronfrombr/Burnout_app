@@ -1,7 +1,9 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle, AlertCircle, X } from "lucide-react";
 import Head from "next/head";
+import emailjs from "@emailjs/browser";
+import axios from "axios";
 
 type ModalType = "success" | "error" | null;
 
@@ -80,6 +82,13 @@ export default function ForgotPassword() {
   const [modalType, setModalType] = useState<ModalType>(null);
   const [modalMessage, setModalMessage] = useState("");
 
+  // Inicializa o EmailJS
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY_2) {
+      emailjs.init(process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY_2);
+    }
+  }, []);
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -93,6 +102,44 @@ export default function ForgotPassword() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const sendResetEmail = async () => {
+    try {
+      // 1. Gera token no backend
+      const tokenResponse = await axios.post('http://localhost:8000/generate-reset-token/', { 
+        email: email 
+      });
+      
+      if (!tokenResponse.data.token) {
+        throw new Error("Token não foi gerado corretamente");
+      }
+  
+      // 2. Prepara link com token real
+      const resetLink = `${window.location.origin}/newpassword?token=${tokenResponse.data.token}&email=${encodeURIComponent(email)}`;
+  
+      // 3. Envia email
+      if (
+        !process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID_2 ||
+        !process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID_3
+      ) {
+        throw new Error("Configuração do EmailJS incompleta");
+      }
+  
+      await emailjs.send(
+        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID_2,
+        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID_3,
+        {
+          to_email: email,
+          reset_link: resetLink,
+          from_name: "EmotionTrack Support",
+        }
+      );
+      
+    } catch (error) {
+      console.error("Erro no processo de reset:", error);
+      alert("Ocorreu um erro ao enviar o email de recuperação. Por favor, tente novamente.");
+    }
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -100,28 +147,19 @@ export default function ForgotPassword() {
       setIsSubmitting(true);
 
       try {
-        console.log("Email para redefinição:", email);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        if (Math.random() > 0.2) {
-          setModalType("success");
-          setModalMessage(
-            `Um link para redefinição de senha foi enviado para ${email}. 
-            Por favor, verifique sua caixa de entrada e siga as instruções.`
-          );
-          setEmail("");
-        } else {
-          throw new Error(
-            "Não encontramos uma conta associada a este email. Verifique se digitou corretamente."
-          );
-        }
+        await sendResetEmail();
+        
+        setModalType("success");
+        setModalMessage(
+          `Um link para redefinição de senha foi enviado para ${email}. 
+          Por favor, verifique sua caixa de entrada e siga as instruções.`
+        );
+        setEmail("");
       } catch (error) {
-        console.error("Erro ao solicitar redefinição:", error);
+        console.error("Erro ao enviar e-mail:", error);
         setModalType("error");
         setModalMessage(
-          error instanceof Error
-            ? error.message
-            : "Ocorreu um erro ao processar sua solicitação. Tente novamente."
+          "Ocorreu um erro ao enviar o e-mail de redefinição. Por favor, tente novamente mais tarde."
         );
       } finally {
         setIsSubmitting(false);
@@ -133,7 +171,7 @@ export default function ForgotPassword() {
     setModalType(null);
     setModalMessage("");
     if (modalType === "success") {
-      console.log("Redirecionando para login...");
+      window.location.href = "/login";
     }
   };
 

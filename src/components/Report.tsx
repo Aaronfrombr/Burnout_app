@@ -300,8 +300,8 @@ export default function Report() {
                 handleSubmit={handleSubmit}
                 isSubmitting={isSubmitting}
                 saveStatus={saveStatus}
-                validationError={validationError}  
-                isReportEmpty={isReportEmpty} 
+                validationError={validationError}
+                isReportEmpty={isReportEmpty}
               />
             )}
           </div>
@@ -363,8 +363,8 @@ interface LoggedViewProps {
   handleSubmit: (e: React.FormEvent) => void;
   isSubmitting: boolean;
   saveStatus: string;
-  validationError: string; 
-  isReportEmpty: boolean; 
+  validationError: string;
+  isReportEmpty: boolean;
 }
 
 const LoggedView = ({
@@ -382,7 +382,7 @@ const LoggedView = ({
   isSubmitting,
   saveStatus,
   validationError,
-  isReportEmpty
+  isReportEmpty,
 }: LoggedViewProps) => (
   <div>
     <div className="space-y-6">
@@ -436,6 +436,28 @@ const LoggedView = ({
           <span className="text-xs text-gray-500">
             {report.length} caracteres
           </span>
+        </div>
+      </div>
+
+      <div className="mt-4 mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm">
+        <div className="flex items-start">
+          <AlertCircle
+            size={18}
+            className="text-yellow-600 mr-2 flex-shrink-0 mt-0.5"
+          />
+          <div>
+            <p className="font-medium text-yellow-800 mb-1">
+              Importante: Sobre anexos e destinatários
+            </p>
+            <p className="text-yellow-700">
+              Qualquer tipo de anexo deve encaminhado
+              diretamente para os emails de autoridades responsáveis como
+              psicólogos e líderes (<strong>dsglucass@gmail.com</strong> e{" "}
+              <strong>aaron.msilva56@gmail.com</strong>). Certifique-se de que
+              os materiais compartilhados são apropriados e relevantes para
+              análise.
+            </p>
+          </div>
         </div>
       </div>
 
