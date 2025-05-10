@@ -26,7 +26,6 @@ type FormDataType = {
   experiencia: string;
   motivacao: string;
   linkedin: string;
-  portfolio: string;
   concordaTermos: boolean;
 };
 
@@ -242,7 +241,7 @@ export default function WorkWithUsPage() {
       {
         from_name: formData.nome,
         from_email: formData.email,
-        message: `Candidatura para ${currentRole}\n\nExperiência: ${formData.experiencia}\nMotivação: ${formData.motivacao}\nTelefone: ${formData.telefone}\nLinkedIn: ${formData.linkedin}\nPortfolio: ${formData.portfolio}`,
+        message: `Candidatura para ${currentRole}\n\nExperiência: ${formData.experiencia}\nMotivação: ${formData.motivacao}\nTelefone: ${formData.telefone}\nLinkedIn: ${formData.linkedin}`,
         curriculo: formData.curriculo ? formData.curriculo.name : "Não enviado",
       }
     );
@@ -265,7 +264,6 @@ export default function WorkWithUsPage() {
     experiencia: "",
     motivacao: "",
     linkedin: "",
-    portfolio: "",
     concordaTermos: false,
   });
 
@@ -365,7 +363,6 @@ export default function WorkWithUsPage() {
         experiencia: "",
         motivacao: "",
         linkedin: "",
-        portfolio: "",
         concordaTermos: false,
       });
       setShowModal(true);
@@ -1048,10 +1045,10 @@ export default function WorkWithUsPage() {
 
                     {formStep === 2 && (
                       <div className="space-y-6">
-                        <div>
+                        <div className="w-full">
                           <label
                             htmlFor="experiencia"
-                            className="block text-gray-700 mb-1 font-medium"
+                            className="block text-gray-700 mb-1 font-medium text-sm sm:text-base"
                           >
                             Experiência Profissional *
                           </label>
@@ -1062,7 +1059,7 @@ export default function WorkWithUsPage() {
                             onChange={handleInputChange}
                             required
                             rows={4}
-                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                            className={`w-full px-3 py-2 sm:px-4 sm:py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                               errors.experiencia
                                 ? "border-red-500 focus:ring-red-500"
                                 : "focus:ring-indigo-500"
@@ -1070,11 +1067,11 @@ export default function WorkWithUsPage() {
                             placeholder="Descreva sua experiência relevante para esta vaga..."
                           ></textarea>
                           {errors.experiencia && (
-                            <p className="mt-1 text-sm text-red-600">
+                            <p className="mt-1 text-xs sm:text-sm text-red-600">
                               {errors.experiencia}
                             </p>
                           )}
-                          <p className="text-sm text-gray-500 mt-1">
+                          <p className="text-xs sm:text-sm text-gray-500 mt-1">
                             {formData.experiencia.length}/50 caracteres mínimos
                           </p>
                         </div>
@@ -1121,23 +1118,6 @@ export default function WorkWithUsPage() {
                               onChange={handleInputChange}
                               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               placeholder="https://linkedin.com/in/seu-perfil"
-                            />
-                          </div>
-                          <div>
-                            <label
-                              htmlFor="portfolio"
-                              className="block text-gray-700 mb-1 font-medium"
-                            >
-                              Portfolio/GitHub
-                            </label>
-                            <input
-                              type="url"
-                              id="portfolio"
-                              name="portfolio"
-                              value={formData.portfolio}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              placeholder="https://github.com/seu-usuario"
                             />
                           </div>
                         </div>
@@ -1227,12 +1207,12 @@ export default function WorkWithUsPage() {
 
                       {formStep < 3 ? (
                         <button
-                        type="button"
-                        onClick={nextStep}
-                        className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors ml-auto"
-                      >
-                        Próximo
-                      </button>
+                          type="button"
+                          onClick={nextStep}
+                          className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors ml-auto"
+                        >
+                          Próximo
+                        </button>
                       ) : (
                         <button
                           type="submit"

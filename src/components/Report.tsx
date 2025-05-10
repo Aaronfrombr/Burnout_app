@@ -40,7 +40,7 @@ export default function Report() {
   const [validationError, setValidationError] = useState("");
   const { isLogged, userName } = useAuth();
   const [report, setReport] = useState("");
-  const [severity, setSeverity] = useState("Médio");
+  const [severity, setSeverity] = useState("Baixo");
   const [emotion, setEmotion] = useState("Neutro");
   const [saveStatus, setSaveStatus] = useState("");
   const [formattedDate, setFormattedDate] = useState("");

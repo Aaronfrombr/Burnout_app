@@ -96,6 +96,7 @@ export default function Dashboard() {
   const [dominantEmotion, setDominantEmotion] = useState<string>("Nenhuma");
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  const [showFlash, setShowFlash] = useState(false);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -241,33 +242,36 @@ export default function Dashboard() {
     });
 
     // Verificar níveis de alerta para todas as emoções
-    Object.entries(emotions).forEach(([emotion, percentage]) => {
-      if (percentage >= 0.5) {
+    Object.entries(emotions).forEach(([emotion, rawPercentage]) => {
+      // Primeiro normaliza o valor para garantir que está entre 0 e 1
+      const normalizedPercentage =
+        rawPercentage > 1 ? rawPercentage / 100 : rawPercentage;
+      const safePercentage = Math.min(1, Math.max(0, normalizedPercentage)); // Garante entre 0 e 1
+
+      if (safePercentage >= 0.5) {
         // Limiar mínimo para mostrar alerta
         let level: AlertLevel = "info";
         let message = "";
+        const percentageDisplay = Math.min(
+          100,
+          Math.round(safePercentage * 100)
+        ); // Limitado a 100%
 
-        if (percentage >= 0.8) {
+        if (safePercentage >= 0.8) {
           level = "critical";
-          message = `${emotionMap[emotion]} em nível elevado (${Math.round(
-            percentage * 100
-          )}%)`;
-        } else if (percentage >= 0.65) {
+          message = `${emotionMap[emotion]} em nível elevado (${percentageDisplay}%)`;
+        } else if (safePercentage >= 0.65) {
           level = "warning";
-          message = `${emotionMap[emotion]} em nível moderado (${Math.round(
-            percentage * 100
-          )}%)`;
+          message = `${emotionMap[emotion]} em nível moderado (${percentageDisplay}%)`;
         } else {
           level = "info";
-          message = `${emotionMap[emotion]} detectada (${Math.round(
-            percentage * 100
-          )}%)`;
+          message = `${emotionMap[emotion]} detectada (${percentageDisplay}%)`;
         }
 
         newAlerts.push({
           emotion,
           level,
-          percentage,
+          percentage: safePercentage, // Armazena o valor normalizado
           message,
           timestamp: new Date(),
         });
@@ -517,7 +521,7 @@ export default function Dashboard() {
     let websocket: WebSocket | null = null;
     let animationId: number | null = null;
     let lastAnalysisTime = 0;
-    const ANALYSIS_INTERVAL = 300; // 300ms entre análises (~3 FPS)
+    const ANALYSIS_INTERVAL = 200;
 
     if (!isLogged || mode !== "continuous" || !isAnalyzing) return;
 
@@ -673,50 +677,61 @@ export default function Dashboard() {
   const analyzeSingleImage = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
+    // 1. Adiciona feedback visual instantâneo (flash)
+    setShowFlash(true);
+    setTimeout(() => setShowFlash(false), 100);
+
     setIsLoading(true);
     setErrorMessage("");
 
     try {
       const canvas = canvasRef.current;
       const context = canvas.getContext("2d");
+      if (!context) throw new Error("Contexto do canvas não disponível");
 
-      if (!context) return;
+      // 2. Congela o frame atual desativando temporariamente a câmera
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      tracks.forEach((track) => (track.enabled = false));
 
-      // Capturar frame do vídeo
+      // 3. Configura o canvas com as dimensões corretas
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
+
+      // 4. Pequeno delay para garantir que o último frame está disponível
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 5. Captura o frame exato
       context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
-      // Obter URL da imagem para exibição
+      // 6. Reativa a câmera imediatamente após a captura
+      tracks.forEach((track) => (track.enabled = true));
+
+      // 7. Cria a URL da imagem
       const imageUrl = canvas.toDataURL("image/jpeg");
       setLastImageUrl(imageUrl);
 
-      // Enviar para análise
+      // 8. Prepara o blob para envio
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error("Falha ao criar blob da imagem"));
-          },
+          (blob) => (blob ? resolve(blob) : reject("Falha ao criar blob")),
           "image/jpeg",
-          0.95
+          0.92 // Qualidade balanceada
         );
       });
 
+      // 9. Envia para análise
       const formData = new FormData();
-      formData.append("file", blob, "capture.jpg");
+      formData.append("file", blob, `captura_${Date.now()}.jpg`);
 
       const response = await fetch("http://localhost:8000/analyze/image", {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Erro na análise da imagem");
-      }
+      if (!response.ok) throw new Error("Erro na análise");
 
       const result = await response.json();
-
       if (result.success) {
         updateChartData(result.result.emotions);
         setDominantEmotion(
@@ -725,8 +740,8 @@ export default function Dashboard() {
         setTotalAnalyzed((prev) => prev + 1);
       }
     } catch (err) {
-      console.error("Erro na análise:", err);
-      setErrorMessage("Erro ao analisar imagem. Tente novamente.");
+      console.error("Erro:", err);
+      setErrorMessage("Falha ao capturar imagem. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
@@ -893,15 +908,32 @@ export default function Dashboard() {
     const doc = new jsPDF();
     const now = new Date().toLocaleString("pt-BR");
 
+    const normalizeValue = (value: number) => {
+      // Se o valor já estiver na escala 0-1 (decimal)
+      if (value >= 0 && value <= 1) {
+        return value * 100;
+      }
+      // Se o valor já estiver na escala 0-100 (porcentagem)
+      else if (value > 1 && value <= 100) {
+        return value;
+      }
+      // Se for um valor acumulado (como nos seus exemplos)
+      else {
+        // Normaliza para a soma total não ultrapassar 100%
+        const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+        return total > 0 ? (value / total) * 100 : 0;
+      }
+    };
+
     doc.setFontSize(16);
     doc.text("Relatório de Análise de Emoções", 14, 20);
 
     doc.setFontSize(12);
-    doc.setTextColor(0, 51, 102); 
+    doc.setTextColor(0, 51, 102);
     doc.text("Informações do Relatório:", 14, 28);
 
     doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0); 
+    doc.setTextColor(0, 0, 0);
     doc.text(`Gerado em: ${now}`, 20, 34);
     doc.text(
       `Solicitado por: ${userName || "Usuário não identificado"}`,
@@ -911,8 +943,14 @@ export default function Dashboard() {
 
     const tableBody = data.labels.map((label, index) => [
       label,
-      data.datasets[0].data[index],
+      `${Math.min(100, normalizeValue(data.datasets[0].data[index])).toFixed(
+        2
+      )}%`,
     ]);
+
+    const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+    const formattedTotal =
+      typeof total === "number" ? (total * 100).toFixed(2) + "%" : total;
 
     autoTable(doc, {
       head: [["Tipo de Emoção", "Quantidade Detectada"]],
@@ -920,9 +958,19 @@ export default function Dashboard() {
       startY: 46,
       theme: "grid",
       headStyles: { fillColor: [41, 128, 185] },
-      styles: { fontSize: 10 },
-      foot: [["Total", data.datasets[0].data.reduce((a, b) => a + b, 0)]],
-      footStyles: { fillColor: [230, 230, 230] },
+      styles: {
+        fontSize: 10,
+        cellPadding: 5,
+        valign: "middle",
+      },
+      columnStyles: {
+        1: { cellWidth: "auto", halign: "right" },
+      },
+      foot: [["Total", "100.00%"]], // Força o total para 100%
+      footStyles: {
+        fillColor: [0, 0, 0],
+        textColor: [255, 255, 255],
+      },
     });
 
     const pageCount = doc.internal.pages.length - 1;
@@ -1027,7 +1075,7 @@ export default function Dashboard() {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div
-          className={`relative border-l-4 ${config.bg} rounded-lg shadow-lg p-4 max-w-md w-full animate-fade-in`}
+          className={`relative border-l-4 ${config.bg} rounded-lg shadow-lg p-4 max-w-md w-full animate-fade-in bg-white`}
         >
           <button
             onClick={() => setShowAlertModal(false)}
@@ -1044,7 +1092,7 @@ export default function Dashboard() {
               </h3>
               <p className="text-gray-700">{currentAlert.message}</p>
 
-              {/* Barra de progresso */}
+              {/* Barra de progresso com porcentagem normalizada */}
               <div className="w-full bg-gray-200 rounded-full h-2.5 mt-3">
                 <div
                   className={`h-2.5 rounded-full ${
@@ -1054,12 +1102,16 @@ export default function Dashboard() {
                       ? "bg-yellow-500"
                       : "bg-blue-500"
                   }`}
-                  style={{ width: `${currentAlert.percentage * 100}%` }}
+                  style={{
+                    width: `${Math.min(100, currentAlert.percentage * 100)}%`,
+                  }}
                 ></div>
               </div>
 
+              {/* Texto da porcentagem formatado */}
               <p className="text-xs text-gray-500 mt-1">
-                Intensidade: {Math.round(currentAlert.percentage * 100)}%
+                Intensidade:{" "}
+                {Math.min(100, Math.round(currentAlert.percentage * 100))}%
               </p>
             </div>
           </div>
@@ -1856,6 +1908,10 @@ export default function Dashboard() {
           </div>
         </div>
       </footer>
+      {/* Efeito de flash ao capturar imagem */}
+      {showFlash && (
+        <div className="fixed inset-0 bg-white opacity-70 z-40 pointer-events-none animate-flash" />
+      )}
     </div>
   );
 }
