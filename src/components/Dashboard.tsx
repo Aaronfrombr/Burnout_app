@@ -29,6 +29,7 @@ import {
   Brain,
   Timer,
   NotepadText,
+  Bot,
 } from "lucide-react";
 import Head from "next/head";
 import { EmotionDetailsModal } from "./EmotionDetailsModal";
@@ -82,10 +83,10 @@ export default function Dashboard() {
     message: string;
     timestamp: Date;
   };
-  // Adicione esses estados
   const [activeAlerts, setActiveAlerts] = useState<EmotionAlert[]>([]);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [currentAlert, setCurrentAlert] = useState<EmotionAlert | null>(null);
+  const [showGeneratingModal, setShowGeneratingModal] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -369,109 +370,6 @@ export default function Dashboard() {
     }
 
     setConsecutiveFrames(updatedCounts);
-  };
-
-  const EmotionDiagnosisModal = () => {
-    if (!diagnosis || !diagnosis.active) return null;
-
-    const handleClose = () => {
-      setDiagnosis((prev) => (prev ? { ...prev, active: false } : null));
-
-      // Se for diagnóstico negativo, permite reiniciar a análise
-      if (diagnosis.type === "negative") {
-        // Aqui você pode adicionar lógica para reiniciar a análise se desejar
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div
-          className={`relative bg-white rounded-xl p-6 max-w-md w-full shadow-2xl transform transition-all 
-          ${
-            diagnosis.type === "positive"
-              ? "animate-bounce-in"
-              : "animate-fade-in"
-          }`}
-        >
-          {/* Header com cor baseada no tipo */}
-          <div
-            className={`absolute top-0 left-0 right-0 h-2 rounded-t-xl 
-            ${diagnosis.type === "positive" ? "bg-green-500" : "bg-red-500"}`}
-          ></div>
-
-          <button
-            onClick={handleClose}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-          >
-            ✕
-          </button>
-
-          <div className="text-center mt-2">
-            <h3
-              className={`text-2xl font-bold mb-2 ${
-                diagnosis.type === "positive"
-                  ? "text-green-600"
-                  : "text-red-600"
-              }`}
-            >
-              {diagnosis.title}
-            </h3>
-
-            <p className="text-gray-700 mb-4">{diagnosis.message}</p>
-
-            {/* Conteúdo específico para cada tipo */}
-            {diagnosis.type === "positive" && diagnosis.compliment && (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                <p className="text-yellow-700 font-medium italic">
-                  "{diagnosis.compliment}"
-                </p>
-              </div>
-            )}
-
-            {diagnosis.type === "negative" && diagnosis.solutions && (
-              <div className="text-left">
-                <h4 className="font-semibold mb-2">
-                  Sugestões para se sentir melhor:
-                </h4>
-                <ul className="space-y-2">
-                  {diagnosis.solutions.map((solution, index) => (
-                    <li key={index} className="flex items-start text-black">
-                      <span className="inline-block bg-blue-100 rounded-full p-1 mr-2">
-                        <svg
-                          className="w-4 h-4 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M5 13l4 4L19 7"
-                          ></path>
-                        </svg>
-                      </span>
-                      {solution}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <button
-              onClick={handleClose}
-              className={`mt-6 px-6 py-2 rounded-full font-medium ${
-                diagnosis.type === "positive"
-                  ? "bg-green-500 hover:bg-green-600 text-white"
-                  : "bg-red-500 hover:bg-red-600 text-white"
-              }`}
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   // Parar câmera
@@ -902,6 +800,167 @@ export default function Dashboard() {
     }
   };
 
+  const generateIAReport = async () => {
+    setShowGeneratingModal(true);
+
+    try {
+      // Verifica se há dados para análise
+      if (!data.labels || data.labels.length === 0) {
+        throw new Error("Nenhum dado de emoção disponível para análise");
+      }
+
+      // Prepara os dados para enviar à IA
+      const emotionData = data.labels.reduce((acc, label, index) => {
+        const key = Object.keys(emotionMap).find(
+          (k) => emotionMap[k] === label
+        );
+        if (key) {
+          acc[key] = data.datasets[0].data[index];
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Cria o prompt para a IA
+      const prompt = `Com base nos seguintes dados de análise emocional:
+${JSON.stringify(emotionData, null, 2)}
+
+Dominant emotion: ${dominantEmotion}
+Total frames analyzed: ${totalAnalyzed}
+
+Por favor, gere um relatório detalhado em português com:
+1. Uma análise geral do estado emocional
+2. Insights sobre possíveis causas para as emoções predominantes
+3. Recomendações para melhorar o bem-estar emocional
+4. Observações relevantes sobre padrões detectados
+
+Formate a resposta em markdown com títulos e parágrafos bem estruturados.`;
+
+      // Chama a API da OpenRouter
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY}`,
+            "HTTP-Referer": window.location.href,
+            "X-Title": "EmotionTrack",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "deepseek/deepseek-prover-v2:free",
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const iaAnalysis =
+        result.choices[0]?.message?.content ||
+        "Não foi possível gerar a análise.";
+
+      // Gera o PDF com a análise da IA
+      generateIAPDF(iaAnalysis);
+    } catch (error) {
+      console.error("Erro ao gerar relatório da IA:", error);
+      setErrorMessage("Falha ao gerar relatório da IA. Tente novamente.");
+    } finally {
+      setShowGeneratingModal(false);
+    }
+  };
+
+  // Função para gerar o PDF com a análise da IA
+  const generateIAPDF = (iaAnalysis: string) => {
+    const doc = new jsPDF();
+    const now = new Date().toLocaleString("pt-BR");
+
+    // Cabeçalho
+    doc.setFontSize(16);
+    doc.setTextColor(0, 51, 102);
+    doc.text("Laudo de Análise Emocional - IA", 14, 20);
+
+    // Informações do relatório
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Gerado em: ${now}`, 14, 30);
+    doc.text(
+      `Solicitado por: ${userName || "Usuário não identificado"}`,
+      14,
+      36
+    );
+    doc.text(`Emoção predominante: ${dominantEmotion}`, 14, 42);
+    doc.text(`Frames analisados: ${totalAnalyzed}`, 14, 48);
+
+    // Gráfico de emoções
+    doc.setFontSize(14);
+    doc.text("Distribuição das Emoções:", 14, 60);
+
+    // Adiciona o gráfico (simplificado como tabela)
+    const rawValues = data?.datasets[0]?.data || [];
+    const total = rawValues.reduce((sum, val) => sum + val, 0);
+
+    const tableData = data?.labels?.map((label, index) => {
+      const value = rawValues[index];
+      const percentage = total > 0 ? (value / total) * 100 : 0;
+      return [label, `${percentage.toFixed(1)}%`];
+    });
+
+    autoTable(doc, {
+      head: [["Emoção", "Intensidade"]],
+      body: tableData,
+      startY: 66,
+      theme: "grid",
+      headStyles: { fillColor: [41, 128, 185] },
+    });
+
+    const yAfterTable = (doc as any).lastAutoTable.finalY;
+
+    // Análise da IA
+    doc.setFontSize(14);
+    doc.text("Análise da Inteligência Artificial:", 14, yAfterTable + 15);
+
+    const splitText = doc.splitTextToSize(iaAnalysis, 180);
+    let currentY = yAfterTable + 25;
+    const lineHeight = 5;
+
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+
+    splitText.forEach((line: any) => {
+      if (currentY > 280) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.text(line, 14, currentY);
+      currentY += lineHeight;
+    });
+
+    // Rodapé na última página
+    const pageCount = doc.getNumberOfPages();
+    doc.setPage(pageCount);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    const text = `Documento gerado pelo EmotionTrack para ${
+      userName || "usuário"
+    } | ${now}`;
+    const pageSize = doc.internal.pageSize;
+    const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+    doc.text(text, pageWidth / 2, 285, { align: "center" });
+
+    // Salva o PDF
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeUserName = userName ? userName.replace(/[^\w]/g, "_") : "usuario";
+    doc.save(`laudo_ia_emotiontrack_${safeUserName}_${timestamp}.pdf`);
+  };
+
   const exportToPDF = () => {
     if (!data?.labels || !data?.datasets?.[0]?.data) return;
 
@@ -966,7 +1025,6 @@ export default function Dashboard() {
       columnStyles: {
         1: { cellWidth: "auto", halign: "right" },
       },
-      foot: [["Total", "100.00%"]], // Força o total para 100%
       footStyles: {
         fillColor: [0, 0, 0],
         textColor: [255, 255, 255],
@@ -1442,17 +1500,15 @@ export default function Dashboard() {
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-gray-700 font-medium">
-                        Relatório Individual
-                      </h3>
+                      <h3 className="text-gray-700 font-medium">Relatórios</h3>
                       <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
-                        O usuário efetuará um relatório individual com base na
-                        análise das emoções efetuada em tempo real e encaminhará
-                        para uma autoridade.
+                        O usuário efetuará um relatório individual ou gerado por
+                        IA com base na análise das emoções efetuada em tempo
+                        real e encaminhará para uma autoridade.
                       </span>
                       <a href="/report">
                         <button
-                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          className={`mb-3 w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
                             !data.labels || data.labels.length === 0
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-purple-600 hover:bg-purple-700 text-white"
@@ -1462,6 +1518,48 @@ export default function Dashboard() {
                           Gerar Relatório
                         </button>
                       </a>
+                      <button
+                        onClick={generateIAReport}
+                        disabled={
+                          !data.labels ||
+                          data.labels.length === 0 ||
+                          showGeneratingModal
+                        }
+                        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          !data.labels || data.labels.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-pink-600 hover:bg-pink-700 text-white"
+                        }`}
+                      >
+                        <Bot className="mr-2" size={18} />
+                        {showGeneratingModal ? (
+                          <>
+                            <svg
+                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            Gerando...
+                          </>
+                        ) : (
+                          "Gerar Relatório (Laudo da IA)"
+                        )}
+                      </button>
                     </div>
                   </>
                 ) : (
@@ -1511,10 +1609,10 @@ export default function Dashboard() {
                       {mode === "singleImage" ? (
                         <button
                           disabled
-                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 ${
+                          className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 cursor-not-allowed ${
                             isLoading
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "bg-gray-300 text-black"
+                              : "bg-gray-300 text-gray-500"
                           }`}
                         >
                           <Camera className="mr-2" size={18} />
@@ -1609,24 +1707,29 @@ export default function Dashboard() {
                         className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
                       >
                         <Download className="mr-2" size={18} />
-                        Exportar CSV
+                        Exportar PDF
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-gray-700 font-medium">
-                        Relatório Individual
-                      </h3>
+                      <h3 className="text-gray-700 font-medium">Relatórios</h3>
                       <span className="block text-sm bg-gray-300 rounded-lg px-2 py-1 text-purple-700 font-bold mt-1 mb-3">
-                        O usuário efetuará um relatório individual com base na
-                        análise das emoções efetuada em tempo real e encaminhará
-                        para uma autoridade.
+                        O usuário efetuará um relatório individual ou gerado por
+                        IA com base na análise das emoções efetuada em tempo
+                        real e encaminhará para uma autoridade.
                       </span>
+                      <button
+                        disabled
+                        className={`mb-3 w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
+                      >
+                        <NotepadText className="mr-2" size={18} />
+                        Gerar Relatório
+                      </button>
                       <button
                         disabled
                         className={`w-full px-6 py-3 rounded-lg flex items-center justify-center transition duration-200 bg-gray-300 text-gray-500 cursor-not-allowed`}
                       >
-                        <NotepadText className="mr-2" size={18} />
-                        Gerar Relatório
+                        <Bot className="mr-2" size={18} />
+                        Gerar Relatório (Laudo da IA)
                       </button>
                     </div>
                   </>
@@ -1703,15 +1806,6 @@ export default function Dashboard() {
 
           {/* Right Panel - Results */}
           <div className="lg:col-span-3">
-            {/* Breadcrumbs */}
-            <nav className="flex items-center text-sm font-medium text-white/60 mb-4">
-              <a href="/" className="hover:text-white">
-                Início
-              </a>
-              <ChevronRight className="h-4 w-4 mx-2" />
-              <span className="text-white">Dashboard</span>
-            </nav>
-
             {/* Chart and Analysis */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
               <div className="bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6">
@@ -1831,7 +1925,6 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
-
       {/* Footer */}
       <footer className="bg-gradient-to-r from-gray-900 to-black py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1911,6 +2004,42 @@ export default function Dashboard() {
       {/* Efeito de flash ao capturar imagem */}
       {showFlash && (
         <div className="fixed inset-0 bg-white opacity-70 z-40 pointer-events-none animate-flash" />
+      )}
+      {showGeneratingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">
+                Gerando Laudo da IA
+              </h3>
+              <button
+                onClick={() => setShowGeneratingModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <div className="animate-pulse mb-4">
+                <Bot size={48} className="text-pink-600" />
+              </div>
+              <p className="text-gray-600 text-center mb-4">
+                Estamos processando sua análise emocional e gerando um relatório
+                completo com insights da nossa IA.
+              </p>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="bg-pink-600 h-2.5 rounded-full animate-progress"
+                  style={{
+                    width: "0%",
+                    animation: "progress 2s ease-in-out infinite",
+                  }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

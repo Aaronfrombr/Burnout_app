@@ -32,3 +32,13 @@ body {
 .animate-bounce-in {
   animation: bounceIn 0.5s ease-out forwards;
 }
+
+@keyframes progress {
+  0% { width: 0%; }
+  50% { width: 100%; }
+  100% { width: 0%; }
+}
+
+.animate-progress {
+  animation: progress 2s ease-in-out infinite;
+}
