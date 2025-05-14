@@ -573,77 +573,74 @@ export default function Dashboard() {
   };
 
   const analyzeSingleImage = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+  if (!videoRef.current || !canvasRef.current) return;
 
-    // 1. Adiciona feedback visual instantâneo (flash)
+  setIsLoading(true);
+  setErrorMessage("");
+
+  try {
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Contexto do canvas não disponível");
+
+    // 1. Congela o vídeo desabilitando os tracks
+    const stream = videoRef.current.srcObject as MediaStream;
+    const tracks = stream.getTracks();
+    tracks.forEach((track) => (track.enabled = false));
+
+    // 2. Garante dimensões corretas
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+
+    // 3. Captura o frame exatamente no momento do clique
+    context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+    // 4. Reativa os tracks imediatamente
+    tracks.forEach((track) => (track.enabled = true));
+
+    // 5. (Opcional) Mostra flash visual depois da captura
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 100);
 
-    setIsLoading(true);
-    setErrorMessage("");
+    // 6. Prepara imagem
+    const imageUrl = canvas.toDataURL("image/jpeg");
+    setLastImageUrl(imageUrl);
 
-    try {
-      const canvas = canvasRef.current;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Contexto do canvas não disponível");
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject("Falha ao criar blob")),
+        "image/jpeg",
+        0.92
+      );
+    });
 
-      // 2. Congela o frame atual desativando temporariamente a câmera
-      const stream = videoRef.current.srcObject as MediaStream;
-      const tracks = stream.getTracks();
-      tracks.forEach((track) => (track.enabled = false));
+    // 7. Envia para o backend
+    const formData = new FormData();
+    formData.append("file", blob, `captura_${Date.now()}.jpg`);
 
-      // 3. Configura o canvas com as dimensões corretas
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+    const response = await fetch("http://localhost:8000/analyze/image", {
+      method: "POST",
+      body: formData,
+    });
 
-      // 4. Pequeno delay para garantir que o último frame está disponível
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    if (!response.ok) throw new Error("Erro na análise");
 
-      // 5. Captura o frame exato
-      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-
-      // 6. Reativa a câmera imediatamente após a captura
-      tracks.forEach((track) => (track.enabled = true));
-
-      // 7. Cria a URL da imagem
-      const imageUrl = canvas.toDataURL("image/jpeg");
-      setLastImageUrl(imageUrl);
-
-      // 8. Prepara o blob para envio
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => (blob ? resolve(blob) : reject("Falha ao criar blob")),
-          "image/jpeg",
-          0.92 // Qualidade balanceada
-        );
-      });
-
-      // 9. Envia para análise
-      const formData = new FormData();
-      formData.append("file", blob, `captura_${Date.now()}.jpg`);
-
-      const response = await fetch("http://localhost:8000/analyze/image", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Erro na análise");
-
-      const result = await response.json();
-      if (result.success) {
-        updateChartData(result.result.emotions);
-        setDominantEmotion(
-          emotionMap[result.result.dominant_emotion] || "Nenhuma"
-        );
-        setTotalAnalyzed((prev) => prev + 1);
-      }
-    } catch (err) {
-      console.error("Erro:", err);
-      setErrorMessage("Falha ao capturar imagem. Tente novamente.");
-    } finally {
-      setIsLoading(false);
+    const result = await response.json();
+    if (result.success) {
+      updateChartData(result.result.emotions);
+      setDominantEmotion(
+        emotionMap[result.result.dominant_emotion] || "Nenhuma"
+      );
+      setTotalAnalyzed((prev) => prev + 1);
     }
-  };
+  } catch (err) {
+    console.error("Erro:", err);
+    setErrorMessage("Falha ao capturar imagem. Tente novamente.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const startContinuousAnalysis = async () => {
     if (!isLogged) return;
