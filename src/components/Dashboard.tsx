@@ -573,74 +573,73 @@ export default function Dashboard() {
   };
 
   const analyzeSingleImage = async () => {
-  if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) return;
 
-  setIsLoading(true);
-  setErrorMessage("");
+    setIsLoading(true);
+    setErrorMessage("");
 
-  try {
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Contexto do canvas não disponível");
+    try {
+      const canvas = canvasRef.current;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Contexto do canvas não disponível");
 
-    // 1. Congela o vídeo desabilitando os tracks
-    const stream = videoRef.current.srcObject as MediaStream;
-    const tracks = stream.getTracks();
-    tracks.forEach((track) => (track.enabled = false));
+      // 1. Congela o vídeo desabilitando os tracks
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      //tracks.forEach((track) => (track.enabled = false));
 
-    // 2. Garante dimensões corretas
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+      // 2. Garante dimensões corretas
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
 
-    // 3. Captura o frame exatamente no momento do clique
-    context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      // 3. Captura o frame exatamente no momento do clique
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
-    // 4. Reativa os tracks imediatamente
-    tracks.forEach((track) => (track.enabled = true));
+      // 4. Reativa os tracks imediatamente
+      tracks.forEach((track) => (track.enabled = true));
 
-    // 5. (Opcional) Mostra flash visual depois da captura
-    setShowFlash(true);
-    setTimeout(() => setShowFlash(false), 100);
+      // 5. (Opcional) Mostra flash visual depois da captura
+      setShowFlash(true);
+      setTimeout(() => setShowFlash(false), 200);
 
-    // 6. Prepara imagem
-    const imageUrl = canvas.toDataURL("image/jpeg");
-    setLastImageUrl(imageUrl);
+      // 6. Prepara imagem
+      const imageUrl = canvas.toDataURL("image/jpeg");
+      setLastImageUrl(imageUrl);
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject("Falha ao criar blob")),
-        "image/jpeg",
-        0.92
-      );
-    });
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject("Falha ao criar blob")),
+          "image/jpeg",
+          0.92
+        );
+      });
 
-    // 7. Envia para o backend
-    const formData = new FormData();
-    formData.append("file", blob, `captura_${Date.now()}.jpg`);
+      // 7. Envia para o backend
+      const formData = new FormData();
+      formData.append("file", blob, `captura_${Date.now()}.jpg`);
 
-    const response = await fetch("http://localhost:8000/analyze/image", {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch("http://localhost:8000/analyze/image", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) throw new Error("Erro na análise");
+      if (!response.ok) throw new Error("Erro na análise");
 
-    const result = await response.json();
-    if (result.success) {
-      updateChartData(result.result.emotions);
-      setDominantEmotion(
-        emotionMap[result.result.dominant_emotion] || "Nenhuma"
-      );
-      setTotalAnalyzed((prev) => prev + 1);
+      const result = await response.json();
+      if (result.success) {
+        updateChartData(result.result.emotions);
+        setDominantEmotion(
+          emotionMap[result.result.dominant_emotion] || "Nenhuma"
+        );
+        setTotalAnalyzed((prev) => prev + 1);
+      }
+    } catch (err) {
+      console.error("Erro:", err);
+      setErrorMessage("Falha ao capturar imagem. Tente novamente.");
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err) {
-    console.error("Erro:", err);
-    setErrorMessage("Falha ao capturar imagem. Tente novamente.");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   const startContinuousAnalysis = async () => {
     if (!isLogged) return;
@@ -1406,6 +1405,40 @@ Formate a resposta em markdown com títulos e parágrafos bem estruturados.`;
                         </button>
                       </div>
                     </div>
+                    <div className="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
+                      <div className="bg-gradient-to-r from-gray-800 to-gray-900 py-4 px-6">
+                        <h2 className="text-white text-xl font-bold flex items-center">
+                          <Camera className="mr-2" />
+                          <span>Câmera</span>
+                        </h2>
+                      </div>
+                      <div className="p-6">
+                        <div className="bg-black rounded-lg overflow-hidden relative aspect-video">
+                          {isLogged ? (
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              muted
+                              playsInline
+                              className="w-full h-auto"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full bg-gray-800">
+                              <div className="text-center p-6">
+                                <Camera
+                                  className="mx-auto text-gray-400 mb-3"
+                                  size={48}
+                                />
+                                <p className="text-gray-300">
+                                  Faça login para acessar a câmera
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <canvas ref={canvasRef} className="hidden" />
+                      </div>
+                    </div>
                     <div>
                       <h3 className="text-gray-700 font-medium mb-3">
                         Controles
@@ -1765,40 +1798,6 @@ Formate a resposta em markdown com títulos e parágrafos bem estruturados.`;
             </div>
 
             {/* Camera View */}
-            <div className="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-gray-800 to-gray-900 py-4 px-6">
-                <h2 className="text-white text-xl font-bold flex items-center">
-                  <Camera className="mr-2" />
-                  <span>Câmera</span>
-                </h2>
-              </div>
-              <div className="p-6">
-                <div className="bg-black rounded-lg overflow-hidden relative aspect-video">
-                  {isLogged ? (
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className="w-full h-auto"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full bg-gray-800">
-                      <div className="text-center p-6">
-                        <Camera
-                          className="mx-auto text-gray-400 mb-3"
-                          size={48}
-                        />
-                        <p className="text-gray-300">
-                          Faça login para acessar a câmera
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <canvas ref={canvasRef} className="hidden" />
-              </div>
-            </div>
           </div>
 
           {/* Right Panel - Results */}

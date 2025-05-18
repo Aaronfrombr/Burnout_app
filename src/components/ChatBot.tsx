@@ -87,11 +87,6 @@ export default function EmotionTrackChatbot(): JSX.Element {
     };
   };
 
-  // Rola a conversa para o final
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   // Gera resposta com base na emoção detectada
   const generateResponse = (text: string, emotion: EmotionAnalysis): string => {
     // Respostas personalizadas para cada emoção
