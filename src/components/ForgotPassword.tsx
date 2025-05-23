@@ -282,7 +282,7 @@ export default function ForgotPassword() {
                 <div className="text-center text-sm text-gray-600">
                   Lembrou sua senha?{" "}
                   <Link
-                    href="/"
+                    href="/login"
                     className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
                   >
                     Voltar para o login
