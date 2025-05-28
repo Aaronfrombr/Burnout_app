@@ -389,7 +389,7 @@ const LoggedView = ({
       {/* User info */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Funcionário
+          Usuário
         </label>
         <div className="flex bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 items-center">
           <User size={18} className="text-gray-500 mr-3" />

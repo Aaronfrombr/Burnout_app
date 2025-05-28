@@ -43,7 +43,7 @@ export default function EmotionTrackChatbot(): JSX.Element {
     // Palavras-chave para cada emoção
     const emotionKeywords: Record<EmotionType, string[]> = {
       happiness: ["feliz", "alegre", "contente", "animado", "ótimo", "maravilhoso", "satisfeito", "entusiasmado", "alegria"],
-      sadness: ["triste", "deprimido", "chateado", "melancólico", "desanimado", "desmotivado", "baixo", "infeliz", "saudade", "perda"],
+      sadness: ["triste", "deprimido", "chateado", "melancólico", "desanimado", "desmotivado", "baixo", "infeliz", "saudade", "perda", "mal"],
       anger: ["irritado", "raiva", "bravo", "furioso", "frustrado", "aborrecido", "indignado", "nervoso", "chateado"],
       anxiety: ["ansioso", "preocupado", "nervoso", "tenso", "inquieto", "estressado", "medo", "assustado", "inseguro"],
       neutral: ["normal", "bem", "ok", "neutro", "regular", "médio", "morno", "tanto faz"]

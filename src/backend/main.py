@@ -443,7 +443,7 @@ async def register_user(user: UserCreate):
         token = create_jwt_token(new_user)
         
         return {
-            "message": "Usuário cadastrado com sucesso!",
+            "message": "Você foi cadastrado com sucesso!",
             "token": token,
             "user": new_user
         }
