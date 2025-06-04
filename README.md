@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Inteligência Artificial Aplicada à Análise de Microexpressões Faciais
 
-## Getting Started
+# Descrição
+Este projeto consiste em um software baseado em Inteligência Artificial (IA) projetado para identificar e analisar microexpressões faciais em tempo real, com o objetivo de mapear emoções humanas durante interações remotas. O sistema integra um chatbot capaz de interpretar emoções em textos digitados e um dashboard que exibe análises de expressões faciais capturadas por webcam. A ferramenta é voltada para o monitoramento emocional de colaboradores em trabalho remoto e estudantes em ambientes virtuais, proporcionando intervenções mais humanizadas e estratégias baseadas em evidências comportamentais.
 
-First, run the development server:
+# Vídeo do Projeto
+https://github.com/user-attachments/assets/a7298cea-2ac2-40d8-b684-0523dade7202
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Funcionalidades
+- Chatbot com IA: Interpreta emoções expressas em textos digitados pelo usuário, classificando-as por intensidade e frequência.
+
+- Reconhecimento Facial: Identifica microexpressões faciais em tempo real utilizando câmera de vídeo.
+
+- Dashboard Interativo: Exibe dados emocionais coletados, permitindo visualizações individuais e coletivas.
+
+- Exportação de Dados: Gera relatórios em formato CSV para análises posteriores manualmente ou feedback por IA (DeepSeek).
+
+- Monitoramento Emocional: Auxilia gestores e educadores na tomada de decisões baseadas em dados emocionais.
+
+# Tecnologias Utilizadas
+- Processamento de Linguagem Natural (NLP): DeepSeak ou GPT-4 para o chatbot.
+
+- Visão Computacional: OpenCV e MediaPipe para detecção de microexpressões faciais.
+
+- Machine Learning: TensorFlow e Keras para treinamento dos modelos de IA.
+
+- Dashboard: Ferramentas como Streamlit ou Dash para visualização de dados.
+
+- Armazenamento de Dados: Banco de dados SQL ou CSV para registros emocionais.
+
+# Como Rodar o Projeto
+-> Pré-requisitos:
+- Python 3.8 ou superior
+
+- Bibliotecas Python: OpenCV, TensorFlow, MediaPipe, NLTK (ou outra biblioteca de NLP)
+
+- Webcam funcional (para análise facial)
+
+Instalação
+```
+git clone github.com/Aaronfrombr/Burnout_app.git
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse a pasta do projeto:
+```
+cd [nome da pasta do projeto]
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Instale as dependências:
+```
+pip install -r requirements.txt
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Execução
+Para iniciar o chatbot, dashboard e toda configuração do backend, as bibliotecas necessárias precisam estar instaladas e por fim é só rodar o comando geral:
+```
+npm run dev:all
+```
 
-## Learn More
+Configuração
+- Certifique-se de que a webcam esteja conectada e configurada corretamente.
 
-To learn more about Next.js, take a look at the following resources:
+- Configure as chaves de API (se necessário) para serviços como GPT-4 ou outras ferramentas de NLP.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Contribuições
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests com melhorias.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Licença
+Este projeto está licenciado sob a licença MIT. Consulte o arquivo LICENSE para mais detalhes.
 
-## Deploy on Vercel
+# Contato
+Aaron Mendes Silva: [aaron.msilva56@gmail.com]
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Lucas de Souza Gomes: [dsglucass@gmail.com]
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Orientador: Lucas Alves dos Santos: [lucas.santos@ifms.edu.br]
+
