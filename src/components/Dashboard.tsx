@@ -843,7 +843,7 @@ Formate a resposta em markdown com títulos e parágrafos bem estruturados.`;
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "deepseek/deepseek-prover-v2:free",
+            model: "deepseek/deepseek-r1-0528:free",
             messages: [
               {
                 role: "user",
